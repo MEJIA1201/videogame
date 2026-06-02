@@ -216,33 +216,7 @@
     </div>
   </a>
 
-  <!-- Tetris -->
-  <a class="card yellow" href="tetris.html">
-    <div class="card-preview">
-      🧱
-      <span class="badge classic">CLÁSICO</span>
-    </div>
-    <div class="card-body">
-      <div class="card-title">TETRIS</div>
-      <div class="card-desc">
-        Encaja las piezas y completa líneas<br>
-        antes de que la pila llegue al tope.<br>
-        Hold, ghost piece y niveles.
-      </div>
-      <div class="card-tags">
-        <span class="tag">PUZZLE</span>
-        <span class="tag">PIEZAS</span>
-        <span class="tag">NIVELES</span>
-        <span class="tag">HOLD</span>
-      </div>
-    </div>
-    <div class="card-footer">
-      <span class="card-score">MEJOR: <span id="tt-best">0</span></span>
-      <button class="play-btn">▶ JUGAR</button>
-    </div>
-  </a>
-
-  <!-- Snake -->
+<!-- Snake -->
   <a class="card green" href="snake.html">
     <div class="card-preview">
       🐍
@@ -298,7 +272,6 @@ drawStars();
 
 // Load best scores from localStorage
 document.getElementById('ss-best').textContent = localStorage.getItem('ss_best') || 0;
-document.getElementById('tt-best').textContent = localStorage.getItem('tt_best') || 0;
 document.getElementById('sn-best').textContent = localStorage.getItem('sn_best') || 0;
 </script>
 </body>
