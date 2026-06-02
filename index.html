@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Arcade Hub</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: #05050f;
+      min-height: 100vh;
+      font-family: 'Press Start 2P', 'Courier New', monospace;
+      color: #fff;
+      overflow-x: hidden;
+    }
+
+    /* Stars */
+    #stars { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+
+    /* Header */
+    header {
+      position: relative; z-index:1;
+      text-align: center;
+      padding: 48px 20px 20px;
+    }
+    header h1 {
+      font-size: clamp(22px, 5vw, 42px);
+      color: #0ff;
+      text-shadow: 0 0 20px #0ff, 0 0 40px #0ff8;
+      letter-spacing: 6px;
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+    header p {
+      margin-top: 14px;
+      font-size: 9px;
+      color: #555;
+      letter-spacing: 3px;
+    }
+    @keyframes pulse {
+      0%,100% { text-shadow: 0 0 20px #0ff, 0 0 40px #0ff8; }
+      50%      { text-shadow: 0 0 30px #0ff, 0 0 70px #0ffc; }
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content:'';
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+      pointer-events:none; z-index:999;
+    }
+
+    /* Grid */
+    .grid {
+      position: relative; z-index:1;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 32px;
+      padding: 40px 20px 80px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Card */
+    .card {
+      width: 280px;
+      background: #0a0a1a;
+      border: 2px solid #1a1a3e;
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .card:hover {
+      transform: translateY(-6px) scale(1.02);
+    }
+    .card.cyan:hover  { border-color:#0ff; box-shadow: 0 0 30px #0ff4, 0 8px 30px #0002; }
+    .card.yellow:hover{ border-color:#ff0; box-shadow: 0 0 30px #ff04, 0 8px 30px #0002; }
+    .card.green:hover { border-color:#0f0; box-shadow: 0 0 30px #0f04, 0 8px 30px #0002; }
+    .card.pink:hover  { border-color:#f0f; box-shadow: 0 0 30px #f0f4, 0 8px 30px #0002; }
+
+    .card-preview {
+      width: 100%;
+      height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card.cyan   .card-preview { background: linear-gradient(135deg,#001a2e,#002a40); }
+    .card.yellow .card-preview { background: linear-gradient(135deg,#1a1400,#2a2000); }
+    .card.green  .card-preview { background: linear-gradient(135deg,#001a00,#002a00); }
+    .card.pink   .card-preview { background: linear-gradient(135deg,#1a001a,#2a002a); }
+
+    .card-preview .badge {
+      position: absolute; top:10px; right:10px;
+      font-size: 7px;
+      padding: 4px 8px;
+      border-radius: 2px;
+      font-family: 'Press Start 2P', monospace;
+    }
+    .badge.new   { background:#0f0; color:#000; }
+    .badge.hot   { background:#f80; color:#000; }
+    .badge.classic { background:#f0f; color:#000; }
+
+    .card-body { padding: 18px 16px 20px; }
+    .card-title {
+      font-size: 13px;
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+    }
+    .card.cyan   .card-title { color:#0ff; }
+    .card.yellow .card-title { color:#ff0; }
+    .card.green  .card-title { color:#0f0; }
+    .card.pink   .card-title { color:#f0f; }
+
+    .card-desc {
+      font-size: 7px;
+      color: #666;
+      line-height: 1.9;
+      margin-bottom: 14px;
+    }
+    .card-tags {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .tag {
+      font-size: 6px;
+      padding: 3px 7px;
+      border-radius: 2px;
+      border: 1px solid;
+    }
+    .card.cyan   .tag { border-color:#0ff4; color:#0ff9; }
+    .card.yellow .tag { border-color:#ff04; color:#ff09; }
+    .card.green  .tag { border-color:#0f04; color:#0f09; }
+    .card.pink   .tag { border-color:#f0f4; color:#f0f9; }
+
+    .card-footer {
+      padding: 12px 16px;
+      border-top: 1px solid #1a1a3e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .play-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: opacity 0.2s;
+    }
+    .play-btn:hover { opacity: 0.85; }
+    .card.cyan   .play-btn { background:#0ff; color:#000; }
+    .card.yellow .play-btn { background:#ff0; color:#000; }
+    .card.green  .play-btn { background:#0f0; color:#000; }
+    .card.pink   .play-btn { background:#f0f; color:#000; }
+
+    .card-score { font-size: 7px; color:#444; }
+
+    /* Coming soon card */
+    .card.coming { opacity:0.45; cursor:default; }
+    .card.coming:hover { transform:none; box-shadow:none; border-color:#1a1a3e; }
+
+    footer {
+      position:relative; z-index:1;
+      text-align:center;
+      padding: 20px;
+      font-size: 7px;
+      color: #333;
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<header>
+  <h1>◈ ARCADE HUB ◈</h1>
+  <p>SELECCIONA UN JUEGO PARA COMENZAR</p>
+</header>
+
+<div class="grid">
+
+  <!-- Space Shooter -->
+  <a class="card cyan" href="space-shooter.html">
+    <div class="card-preview">
+      🚀
+      <span class="badge hot">HOT</span>
+    </div>
+    <div class="card-body">
+      <div class="card-title">SPACE SHOOTER</div>
+      <div class="card-desc">
+        Defiende la galaxia de meteoritos.<br>
+        Recoge power-ups, sube de nivel<br>
+        y sobrevive el mayor tiempo posible.
+      </div>
+      <div class="card-tags">
+        <span class="tag">ACCIÓN</span>
+        <span class="tag">POWER-UPS</span>
+        <span class="tag">NIVELES</span>
+        <span class="tag">ESCUDO</span>
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="card-score">MEJOR: <span id="ss-best">0</span></span>
+      <button class="play-btn">▶ JUGAR</button>
+    </div>
+  </a>
+
+  <!-- Tetris -->
+  <a class="card yellow" href="tetris.html">
+    <div class="card-preview">
+      🧱
+      <span class="badge classic">CLÁSICO</span>
+    </div>
+    <div class="card-body">
+      <div class="card-title">TETRIS</div>
+      <div class="card-desc">
+        Encaja las piezas y completa líneas<br>
+        antes de que la pila llegue al tope.<br>
+        Hold, ghost piece y niveles.
+      </div>
+      <div class="card-tags">
+        <span class="tag">PUZZLE</span>
+        <span class="tag">PIEZAS</span>
+        <span class="tag">NIVELES</span>
+        <span class="tag">HOLD</span>
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="card-score">MEJOR: <span id="tt-best">0</span></span>
+      <button class="play-btn">▶ JUGAR</button>
+    </div>
+  </a>
+
+  <!-- Snake -->
+  <a class="card green" href="snake.html">
+    <div class="card-preview">
+      🐍
+      <span class="badge new">NEW</span>
+    </div>
+    <div class="card-body">
+      <div class="card-title">SNAKE</div>
+      <div class="card-desc">
+        El clásico juego de la serpiente.<br>
+        Come manzanas, recoge power-ups<br>
+        y no chocarte contigo mismo.
+      </div>
+      <div class="card-tags">
+        <span class="tag">CLÁSICO</span>
+        <span class="tag">SERPIENTE</span>
+        <span class="tag">POWER-UPS</span>
+        <span class="tag">NIVELES</span>
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="card-score">MEJOR: <span id="sn-best">0</span></span>
+      <button class="play-btn">▶ JUGAR</button>
+    </div>
+  </a>
+
+</div>
+
+<footer>◈ ARCADE HUB v1.0 — TODOS LOS JUEGOS EN UN SOLO LUGAR ◈</footer>
+
+<script>
+// Animated stars canvas
+const c = document.getElementById('stars');
+const cx = c.getContext('2d');
+c.width = window.innerWidth; c.height = window.innerHeight;
+window.addEventListener('resize', () => { c.width = window.innerWidth; c.height = window.innerHeight; });
+const starsArr = Array.from({length:160}, () => ({
+  x: Math.random()*c.width, y: Math.random()*c.height,
+  r: Math.random()*1.4+0.2, speed: Math.random()*0.3+0.05, alpha: Math.random()*0.6+0.2
+}));
+function drawStars() {
+  cx.clearRect(0,0,c.width,c.height);
+  starsArr.forEach(s => {
+    s.y += s.speed;
+    if (s.y > c.height) { s.y=0; s.x=Math.random()*c.width; }
+    cx.globalAlpha = s.alpha;
+    cx.fillStyle='#fff';
+    cx.beginPath(); cx.arc(s.x,s.y,s.r,0,Math.PI*2); cx.fill();
+  });
+  cx.globalAlpha=1;
+  requestAnimationFrame(drawStars);
+}
+drawStars();
+
+// Load best scores from localStorage
+document.getElementById('ss-best').textContent = localStorage.getItem('ss_best') || 0;
+document.getElementById('tt-best').textContent = localStorage.getItem('tt_best') || 0;
+document.getElementById('sn-best').textContent = localStorage.getItem('sn_best') || 0;
+</script>
+</body>
+</html>
