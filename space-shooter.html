@@ -35,6 +35,7 @@
       position: relative;
       width: 480px;
       height: 640px;
+      transform-origin: top center;
     }
     canvas {
       display: block;
@@ -78,6 +79,66 @@
       position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
       font-size: 11px; color: #555; pointer-events: none; white-space: nowrap;
     }
+
+    /* ── Responsive canvas scaling ── */
+    /* (gameWrapper already defined above with transform-origin) */
+
+    /* ── Mobile touch controls ── */
+    #touchControls {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 170px;
+      z-index: 50;
+      pointer-events: none;
+    }
+    #joystickArea {
+      position: absolute;
+      left: 20px; bottom: 20px;
+      width: 130px; height: 130px;
+      pointer-events: all;
+      touch-action: none;
+    }
+    #joystickBase {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      background: rgba(0,255,255,0.08);
+      border: 2px solid rgba(0,255,255,0.3);
+    }
+    #joystickKnob {
+      position: absolute;
+      width: 52px; height: 52px;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      border-radius: 50%;
+      background: rgba(0,255,255,0.25);
+      border: 2px solid #0ff;
+      box-shadow: 0 0 12px #0ff6;
+      pointer-events: none;
+    }
+    #fireBtn {
+      position: absolute;
+      right: 30px; bottom: 30px;
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: rgba(255,200,0,0.15);
+      border: 3px solid #ff0;
+      color: #ff0;
+      font-size: 26px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 16px #ff04;
+      pointer-events: all;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #fireBtn:active { background: rgba(255,200,0,0.35); }
+
+    @media (max-width: 540px) {
+      #touchControls { display: block; }
+      #powerupHint { display: none; }
+      body { justify-content: flex-start; padding-top: 4px; }
+    }
   </style>
 </head>
 <body>
@@ -101,6 +162,15 @@
     <button id="startBtn">▶ INICIAR</button>
     <button class="btn-menu" onclick="window.location.href='index.html'">◀ MENÚ PRINCIPAL</button>
   </div>
+</div>
+
+<!-- Mobile touch controls -->
+<div id="touchControls">
+  <div id="joystickArea">
+    <div id="joystickBase"></div>
+    <div id="joystickKnob"></div>
+  </div>
+  <div id="fireBtn">🔥</div>
 </div>
 
 <script>
@@ -174,41 +244,329 @@ function drawBoss() {
   if(!boss) return;
   const b = boss;
   b.anim += 0.04;
+  const n = bossNum;
   ctx.save(); ctx.translate(b.x, b.y);
 
-  // Aura pulsante
-  ctx.globalAlpha = 0.18 + 0.08*Math.sin(b.anim*2);
-  ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 40;
-  ctx.beginPath(); ctx.arc(0, 0, b.w*0.85, 0, Math.PI*2); ctx.fill();
-  ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-
-  // Flash de daño
+  // Flash de daño (compartido)
   if(b.hitFlash > 0) { ctx.globalAlpha = b.hitFlash/8; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,b.w,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
 
-  // Cuerpo principal (nave jefe)
-  ctx.shadowColor = b.color; ctx.shadowBlur = 18;
-  ctx.fillStyle = b.color;
-  // Cuerpo central
-  ctx.beginPath();
-  ctx.moveTo(0, 30); ctx.lineTo(-b.w*0.5, -10); ctx.lineTo(-b.w*0.35, -30);
-  ctx.lineTo(0, -20); ctx.lineTo(b.w*0.35, -30); ctx.lineTo(b.w*0.5, -10);
-  ctx.closePath(); ctx.fill();
-  // Alas
-  ctx.fillStyle = `hsl(${280 + bossNum*20},70%,35%)`;
-  ctx.beginPath(); ctx.moveTo(-b.w*0.5,-10); ctx.lineTo(-b.w*0.9,10); ctx.lineTo(-b.w*0.55,20); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(b.w*0.5,-10); ctx.lineTo(b.w*0.9,10); ctx.lineTo(b.w*0.55,20); ctx.closePath(); ctx.fill();
-  // Cañón central
-  ctx.fillStyle = '#222';
-  ctx.fillRect(-6, 18, 12, 18);
-  // Ojos/luces
-  ctx.fillStyle = '#f00'; ctx.shadowColor='#f00'; ctx.shadowBlur=10;
-  ctx.beginPath(); ctx.arc(-18,-8,5,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(18,-8,5,0,Math.PI*2); ctx.fill();
-  ctx.shadowBlur=0;
+  // ── JEFE 1: Demonio Asylum — masivo, marrón/naranja, martillo ──
+  if(n === 1) {
+    ctx.globalAlpha = 0.15 + 0.07*Math.sin(b.anim*2);
+    ctx.fillStyle = '#c85000'; ctx.shadowColor = '#ff6600'; ctx.shadowBlur = 40;
+    ctx.beginPath(); ctx.arc(0, 0, b.w, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    ctx.fillStyle = '#5a3010'; ctx.shadowColor='#c86020'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.ellipse(0, 5, b.w*0.55, b.h*0.65, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#3d2008';
+    ctx.beginPath(); ctx.ellipse(-b.w*0.5, -5, 20, 16, -0.3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( b.w*0.5, -5, 20, 16,  0.3, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#3d2008'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(b.w*0.5, -5); ctx.lineTo(b.w*0.75, 18+Math.sin(b.anim)*8); ctx.stroke();
+    ctx.fillStyle = '#666'; ctx.shadowColor='#888'; ctx.shadowBlur=6;
+    ctx.fillRect(b.w*0.65, 18+Math.sin(b.anim)*8, 22, 14);
+    ctx.strokeStyle = '#3d2008'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(-b.w*0.5, -5); ctx.lineTo(-b.w*0.7, 10+Math.cos(b.anim)*5); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#6b3c18'; ctx.shadowColor='#c86020'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.ellipse(0, -b.h*0.5, 22, 18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#2a1505';
+    ctx.beginPath(); ctx.moveTo(-14,-b.h*0.5-12); ctx.lineTo(-20,-b.h*0.5-32); ctx.lineTo(-6,-b.h*0.5-14); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo( 14,-b.h*0.5-12); ctx.lineTo( 20,-b.h*0.5-32); ctx.lineTo(  6,-b.h*0.5-14); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#ff4400'; ctx.shadowColor='#ff4400'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.arc(-8,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 8,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
 
-  // Número del jefe
-  ctx.fillStyle='#fff'; ctx.font=`bold 13px Courier New`; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(`JEFE ${bossNum}`, 0, -5);
+  // ── JEFE 2: Queelag — araña/lava, rojo, patas ──
+  if(n === 2) {
+    ctx.globalAlpha = 0.15 + 0.07*Math.sin(b.anim*2);
+    ctx.fillStyle = '#aa0000'; ctx.shadowColor='#ff3300'; ctx.shadowBlur=40;
+    ctx.beginPath(); ctx.arc(0, 0, b.w, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    ctx.fillStyle = '#1a0000'; ctx.shadowColor='#cc2200'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.ellipse(0, 10, b.w*0.5, b.h*0.55, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#3a0000'; ctx.lineWidth = 5;
+    [[-1,1],[-0.6,0.6],[-1.1,-0.2],[-0.65,-0.5]].forEach(([lx,rx], i) => {
+      const yo = i * 10 - 10, wiggle = Math.sin(b.anim*3+i)*6;
+      ctx.beginPath(); ctx.moveTo(-18, yo); ctx.lineTo(-b.w*0.8+lx*10, yo+16+wiggle); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo( 18, yo); ctx.lineTo( b.w*0.8+rx*10, yo+16+wiggle); ctx.stroke();
+    });
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#4a1010'; ctx.shadowColor='#cc2200'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.ellipse(0, -b.h*0.3, 16, 22, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#3a0808';
+    ctx.beginPath(); ctx.ellipse(0, -b.h*0.6, 12, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#110000'; ctx.lineWidth = 2;
+    for(let i=-3;i<=3;i++) { ctx.beginPath(); ctx.moveTo(i*4,-b.h*0.6-10); ctx.lineTo(i*5+Math.sin(b.anim+i)*3,-b.h*0.6-28); ctx.stroke(); }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle='#ff2200'; ctx.shadowColor='#ff2200'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(-5,-b.h*0.62,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 5,-b.h*0.62,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = `rgba(255,${80+Math.floor(Math.sin(b.anim*4)*40)},0,0.5)`;
+    ctx.shadowColor='#ff5500'; ctx.shadowBlur=18;
+    ctx.beginPath(); ctx.ellipse(0, 16, 20, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+
+  // ── JEFE 3: Cuatro Reyes — espectral, violeta ──
+  if(n === 3) {
+    ctx.globalAlpha = 0.12 + 0.1*Math.sin(b.anim*1.5);
+    ctx.fillStyle = '#6600aa'; ctx.shadowColor='#aa00ff'; ctx.shadowBlur=50;
+    ctx.beginPath(); ctx.arc(0, 0, b.w*1.1, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    [[-22,-8],[22,-8],[-12,14],[12,14]].forEach(([ox,oy], i) => {
+      const drift = Math.sin(b.anim*1.2+i*1.3)*4;
+      ctx.globalAlpha = 0.55 + 0.15*Math.sin(b.anim+i);
+      ctx.fillStyle = i%2===0 ? '#330055' : '#220044';
+      ctx.shadowColor = '#aa00ff'; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.moveTo(ox,oy-18+drift); ctx.lineTo(ox-10,oy+10+drift); ctx.lineTo(ox-6,oy+22+drift); ctx.lineTo(ox+6,oy+22+drift); ctx.lineTo(ox+10,oy+10+drift); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#7700cc'; ctx.fillRect(ox-8,oy-22+drift,16,5);
+      ctx.beginPath(); ctx.arc(ox,oy-22+drift,3,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ff00ff'; ctx.shadowColor='#ff00ff'; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(ox,oy-10+drift,3,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  }
+
+  // ── JEFE 4: Gravelord Nito — calaveras, verde neón, guadaña ──
+  if(n === 4) {
+    ctx.globalAlpha = 0.14 + 0.08*Math.sin(b.anim*1.8);
+    ctx.fillStyle = '#001a00'; ctx.shadowColor='#00ff44'; ctx.shadowBlur=44;
+    ctx.beginPath(); ctx.arc(0, 0, b.w, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    ctx.fillStyle = '#050a05'; ctx.shadowColor='#00aa22'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.moveTo(0,-b.h*0.6); ctx.bezierCurveTo(-b.w*0.7,-b.h*0.1,-b.w*0.8,b.h*0.4,-b.w*0.3,b.h*0.5); ctx.lineTo(b.w*0.3,b.h*0.5); ctx.bezierCurveTo(b.w*0.8,b.h*0.4,b.w*0.7,-b.h*0.1,0,-b.h*0.6); ctx.fill();
+    ctx.shadowBlur = 0;
+    [[-20,0],[20,0],[0,15],[-10,-14]].forEach(([sx,sy]) => {
+      ctx.fillStyle = '#c8c8a0'; ctx.shadowColor='#00ff44'; ctx.shadowBlur=6;
+      ctx.beginPath(); ctx.ellipse(sx,sy,7,6,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#050a05';
+      ctx.beginPath(); ctx.ellipse(sx-2,sy+1,2,2.5,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(sx+2,sy+1,2,2.5,0,0,Math.PI*2); ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#334433'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(b.w*0.35,-b.h*0.3); ctx.lineTo(b.w*0.7,b.h*0.1+Math.sin(b.anim)*6); ctx.stroke();
+    ctx.strokeStyle = '#aaffaa'; ctx.lineWidth = 2; ctx.shadowColor='#00ff88'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.arc(b.w*0.7+12,b.h*0.1+Math.sin(b.anim)*6-12,18,0.3,Math.PI*0.9); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle='#00ff44'; ctx.shadowColor='#00ff44'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(-6,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 6,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── JEFE 5+: Gwyn, Señor del Sol — dorado, llamas, corona, espada ──
+  if(n >= 5) {
+    // Aura solar pulsante
+    ctx.globalAlpha = 0.18 + 0.1*Math.sin(b.anim*2);
+    ctx.fillStyle = '#aa7700'; ctx.shadowColor='#ffcc00'; ctx.shadowBlur=55;
+    ctx.beginPath(); ctx.arc(0, 0, b.w*1.1, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    // Llamas laterales animadas
+    for(let side of [-1,1]) {
+      const fg = ctx.createRadialGradient(side*b.w*0.55, 0, 2, side*b.w*0.55, 0, 28);
+      fg.addColorStop(0, `rgba(255,200,0,${0.7+0.2*Math.sin(b.anim*3)})`);
+      fg.addColorStop(1, 'transparent');
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.arc(side*b.w*0.55, Math.sin(b.anim*2+side)*5, 26, 0, Math.PI*2); ctx.fill();
+    }
+    // Armadura dorada — cuerpo
+    ctx.fillStyle = '#7a5800'; ctx.shadowColor='#ffcc00'; ctx.shadowBlur=16;
+    ctx.beginPath();
+    ctx.moveTo(0, -b.h*0.65);
+    ctx.lineTo(-b.w*0.38, -b.h*0.1);
+    ctx.lineTo(-b.w*0.3, b.h*0.45);
+    ctx.lineTo( b.w*0.3, b.h*0.45);
+    ctx.lineTo( b.w*0.38, -b.h*0.1);
+    ctx.closePath(); ctx.fill();
+    // Hombros con hombreras
+    ctx.fillStyle = '#9a7200';
+    ctx.beginPath(); ctx.ellipse(-b.w*0.42, -b.h*0.15, 16, 12, -0.4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( b.w*0.42, -b.h*0.15, 16, 12,  0.4, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    // Capa trasera
+    ctx.fillStyle = '#3a2000';
+    ctx.beginPath();
+    ctx.moveTo(-b.w*0.3, -b.h*0.1);
+    ctx.lineTo(-b.w*0.6, b.h*0.5+Math.sin(b.anim)*6);
+    ctx.lineTo( b.w*0.6, b.h*0.5+Math.sin(b.anim+1)*6);
+    ctx.lineTo( b.w*0.3, -b.h*0.1);
+    ctx.closePath(); ctx.fill();
+    // Espada (brazo derecho)
+    ctx.save(); ctx.translate(b.w*0.45, -b.h*0.1);
+    ctx.rotate(0.4 + Math.sin(b.anim)*0.15);
+    ctx.fillStyle = '#ccaa00'; ctx.shadowColor='#ffee44'; ctx.shadowBlur=12;
+    ctx.fillRect(-3, -b.h*0.5, 6, b.h*0.7); // hoja
+    ctx.fillStyle = '#4a3000'; ctx.fillRect(-10, -b.h*0.07, 20, 5); // guarda
+    ctx.shadowBlur = 0; ctx.restore();
+    // Cabeza
+    ctx.fillStyle = '#8a6600'; ctx.shadowColor='#ffcc00'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.ellipse(0, -b.h*0.72, 14, 14, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    // Corona
+    ctx.fillStyle = '#ffcc00'; ctx.shadowColor='#ffee00'; ctx.shadowBlur=14;
+    ctx.beginPath();
+    ctx.moveTo(-12, -b.h*0.82); ctx.lineTo(-12, -b.h*0.95);
+    ctx.lineTo(-7,  -b.h*0.87); ctx.lineTo(0,  -b.h*1.0);
+    ctx.lineTo( 7,  -b.h*0.87); ctx.lineTo(12, -b.h*0.95);
+    ctx.lineTo(12, -b.h*0.82); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    // Ojos dorados
+    ctx.fillStyle='#fff7aa'; ctx.shadowColor='#ffee00'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(-5,-b.h*0.73,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 5,-b.h*0.73,3,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
+  if(n === 4) {
+    ctx.globalAlpha = 0.14 + 0.08*Math.sin(b.anim*1.8);
+    ctx.fillStyle = '#001a00'; ctx.shadowColor='#00ff44'; ctx.shadowBlur=44;
+    ctx.beginPath(); ctx.arc(0, 0, b.w, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    // Manto oscuro
+    ctx.fillStyle = '#050a05'; ctx.shadowColor='#00aa22'; ctx.shadowBlur=10;
+    ctx.beginPath();
+    ctx.moveTo(0, -b.h*0.6);
+    ctx.bezierCurveTo(-b.w*0.7, -b.h*0.1, -b.w*0.8, b.h*0.4, -b.w*0.3, b.h*0.5);
+    ctx.lineTo( b.w*0.3, b.h*0.5);
+    ctx.bezierCurveTo( b.w*0.8, b.h*0.4,  b.w*0.7, -b.h*0.1, 0, -b.h*0.6);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Calaveras incrustadas (4 pequeñas)
+    const skullPos = [[-20,0],[20,0],[0,15],[-10,-14]];
+    skullPos.forEach(([sx,sy]) => {
+      ctx.fillStyle = '#c8c8a0'; ctx.shadowColor='#00ff44'; ctx.shadowBlur=6;
+      ctx.beginPath(); ctx.ellipse(sx, sy, 7, 6, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#050a05';
+      ctx.beginPath(); ctx.ellipse(sx-2, sy+1, 2, 2.5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(sx+2, sy+1, 2, 2.5, 0, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+    // Guadaña (brazo derecho)
+    ctx.strokeStyle = '#334433'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(b.w*0.35, -b.h*0.3); ctx.lineTo(b.w*0.7, b.h*0.1+Math.sin(b.anim)*6); ctx.stroke();
+    ctx.strokeStyle = '#aaffaa'; ctx.lineWidth = 2; ctx.shadowColor='#00ff88'; ctx.shadowBlur=10;
+    ctx.beginPath();
+    ctx.arc(b.w*0.7+12, b.h*0.1+Math.sin(b.anim)*6-12, 18, 0.3, Math.PI*0.9);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // Ojos verde neón
+    ctx.fillStyle='#00ff44'; ctx.shadowColor='#00ff44'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(-6,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 6,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  if(n === 3) {
+    // Aura espectral
+    ctx.globalAlpha = 0.12 + 0.1*Math.sin(b.anim*1.5);
+    ctx.fillStyle = '#6600aa'; ctx.shadowColor='#aa00ff'; ctx.shadowBlur=50;
+    ctx.beginPath(); ctx.arc(0, 0, b.w*1.1, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    // Cuatro siluetas fantasmales desplazadas
+    const offsets = [[-22,-8],[22,-8],[-12,14],[12,14]];
+    offsets.forEach(([ox,oy], i) => {
+      const drift = Math.sin(b.anim*1.2 + i*1.3)*4;
+      ctx.globalAlpha = 0.55 + 0.15*Math.sin(b.anim+i);
+      ctx.fillStyle = i%2===0 ? '#330055' : '#220044';
+      ctx.shadowColor = '#aa00ff'; ctx.shadowBlur = 16;
+      // Cuerpo fantasmal
+      ctx.beginPath();
+      ctx.moveTo(ox, oy-18+drift);
+      ctx.lineTo(ox-10, oy+10+drift);
+      ctx.lineTo(ox-6, oy+22+drift);
+      ctx.lineTo(ox+6, oy+22+drift);
+      ctx.lineTo(ox+10, oy+10+drift);
+      ctx.closePath(); ctx.fill();
+      // Corona simple
+      ctx.fillStyle = '#7700cc';
+      ctx.fillRect(ox-8, oy-22+drift, 16, 5);
+      ctx.beginPath(); ctx.arc(ox, oy-22+drift, 3, 0, Math.PI*2); ctx.fill();
+      // Ojo
+      ctx.fillStyle = '#ff00ff'; ctx.shadowColor='#ff00ff'; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(ox, oy-10+drift, 3, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  }
+  if(n === 2) {
+    ctx.globalAlpha = 0.15 + 0.07*Math.sin(b.anim*2);
+    ctx.fillStyle = '#aa0000'; ctx.shadowColor='#ff3300'; ctx.shadowBlur=40;
+    ctx.beginPath(); ctx.arc(0, 0, b.w, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    // Cuerpo araña (abdomen)
+    ctx.fillStyle = '#1a0000'; ctx.shadowColor='#cc2200'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.ellipse(0, 10, b.w*0.5, b.h*0.55, 0, 0, Math.PI*2); ctx.fill();
+    // Patas (4 pares)
+    ctx.strokeStyle = '#3a0000'; ctx.lineWidth = 5;
+    [[-1,1],[-0.6,0.6],[-1.1,-0.2],[-0.65,-0.5]].forEach(([lx,rx], i) => {
+      const yo = i * 10 - 10;
+      const wiggle = Math.sin(b.anim * 3 + i) * 6;
+      ctx.beginPath(); ctx.moveTo(-18, yo); ctx.lineTo(-b.w*0.8+lx*10, yo+16+wiggle); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo( 18, yo); ctx.lineTo( b.w*0.8+rx*10, yo+16+wiggle); ctx.stroke();
+    });
+    ctx.shadowBlur = 0;
+    // Torso humanoide (parte superior)
+    ctx.fillStyle = '#4a1010'; ctx.shadowColor='#cc2200'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.ellipse(0, -b.h*0.3, 16, 22, 0, 0, Math.PI*2); ctx.fill();
+    // Cabeza
+    ctx.fillStyle = '#3a0808';
+    ctx.beginPath(); ctx.ellipse(0, -b.h*0.6, 12, 12, 0, 0, Math.PI*2); ctx.fill();
+    // Pelo largo (líneas)
+    ctx.strokeStyle = '#110000'; ctx.lineWidth = 2;
+    for(let i=-3;i<=3;i++) { ctx.beginPath(); ctx.moveTo(i*4,-b.h*0.6-10); ctx.lineTo(i*5+Math.sin(b.anim+i)*3,-b.h*0.6-28); ctx.stroke(); }
+    ctx.shadowBlur = 0;
+    // Ojos brillantes
+    ctx.fillStyle='#ff2200'; ctx.shadowColor='#ff2200'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(-5,-b.h*0.62,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 5,-b.h*0.62,3,0,Math.PI*2); ctx.fill();
+    // Lava en el vientre
+    ctx.fillStyle = `rgba(255,${80+Math.floor(Math.sin(b.anim*4)*40)},0,0.5)`;
+    ctx.shadowColor='#ff5500'; ctx.shadowBlur=18;
+    ctx.beginPath(); ctx.ellipse(0, 16, 20, 12, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  if(n === 1) {
+    // Aura naranja
+    ctx.globalAlpha = 0.15 + 0.07*Math.sin(b.anim*2);
+    ctx.fillStyle = '#c85000'; ctx.shadowColor = '#ff6600'; ctx.shadowBlur = 40;
+    ctx.beginPath(); ctx.arc(0, 0, b.w, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    // Cuerpo gordo
+    ctx.fillStyle = '#5a3010'; ctx.shadowColor='#c86020'; ctx.shadowBlur=12;
+    ctx.beginPath();
+    ctx.ellipse(0, 5, b.w*0.55, b.h*0.65, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Hombros
+    ctx.fillStyle = '#3d2008';
+    ctx.beginPath(); ctx.ellipse(-b.w*0.5, -5, 20, 16, -0.3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( b.w*0.5, -5, 20, 16,  0.3, 0, Math.PI*2); ctx.fill();
+    // Brazo con martillo (derecho)
+    ctx.strokeStyle = '#3d2008'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(b.w*0.5, -5); ctx.lineTo(b.w*0.75, 18+Math.sin(b.anim)*8); ctx.stroke();
+    ctx.fillStyle = '#666'; ctx.shadowColor='#888'; ctx.shadowBlur=6;
+    ctx.fillRect(b.w*0.65, 18+Math.sin(b.anim)*8, 22, 14);
+    // Brazo izquierdo
+    ctx.strokeStyle = '#3d2008'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(-b.w*0.5, -5); ctx.lineTo(-b.w*0.7, 10+Math.cos(b.anim)*5); ctx.stroke();
+    ctx.shadowBlur = 0;
+    // Cabeza
+    ctx.fillStyle = '#6b3c18'; ctx.shadowColor='#c86020'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.ellipse(0, -b.h*0.5, 22, 18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    // Cuernos
+    ctx.fillStyle = '#2a1505';
+    ctx.beginPath(); ctx.moveTo(-14,-b.h*0.5-12); ctx.lineTo(-20,-b.h*0.5-32); ctx.lineTo(-6,-b.h*0.5-14); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo( 14,-b.h*0.5-12); ctx.lineTo( 20,-b.h*0.5-32); ctx.lineTo(  6,-b.h*0.5-14); ctx.closePath(); ctx.fill();
+    // Ojos
+    ctx.fillStyle='#ff4400'; ctx.shadowColor='#ff4400'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.arc(-8,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 8,-b.h*0.5,4,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
 
   ctx.restore();
 
@@ -382,28 +740,144 @@ function drawStars() {
 }
 
 function drawPlayer() {
-  const p=player; ctx.save(); ctx.translate(p.x,p.y);
-  if(p.shield>0){
-    ctx.globalAlpha=Math.min(1,p.shield/60)*0.5;
-    ctx.strokeStyle='#0ff'; ctx.lineWidth=3; ctx.shadowColor='#0ff'; ctx.shadowBlur=12;
-    ctx.beginPath(); ctx.arc(0,0,32,0,Math.PI*2); ctx.stroke();
-    ctx.globalAlpha=1; ctx.shadowBlur=0;
+  const p = player;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  // Escudo
+  if (p.shield > 0) {
+    ctx.globalAlpha = Math.min(1, p.shield / 60) * 0.5;
+    ctx.strokeStyle = '#0ff'; ctx.lineWidth = 3;
+    ctx.shadowColor = '#0ff'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   }
-  if(p.invincible>0&&Math.floor(p.invincible/4)%2===0){ctx.restore();return;}
-  p.thrusterAnim=(p.thrusterAnim+0.3)%(Math.PI*2);
-  const flameH=14+Math.sin(p.thrusterAnim)*5;
-  const grad=ctx.createLinearGradient(0,10,0,10+flameH);
-  grad.addColorStop(0,'#ff8800'); grad.addColorStop(1,'transparent');
-  ctx.fillStyle=grad;
-  ctx.beginPath(); ctx.moveTo(-8,10); ctx.lineTo(8,10); ctx.lineTo(0,10+flameH); ctx.closePath(); ctx.fill();
-  ctx.fillStyle='#0cf'; ctx.shadowColor='#0cf'; ctx.shadowBlur=10;
-  ctx.beginPath(); ctx.moveTo(0,-19); ctx.lineTo(20,14); ctx.lineTo(10,8); ctx.lineTo(-10,8); ctx.lineTo(-20,14); ctx.closePath(); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.shadowBlur=0;
-  ctx.beginPath(); ctx.ellipse(0,-4,5,8,0,0,Math.PI*2); ctx.fill();
-  if(p.tripleShot>0){
-    ctx.fillStyle=`rgba(255,100,0,${0.4+0.3*Math.sin(frameCount*0.2)})`;
-    ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill();
+
+  // Parpadeo de invencibilidad
+  if (p.invincible > 0 && Math.floor(p.invincible / 4) % 2 === 0) {
+    ctx.restore(); return;
   }
+
+  p.thrusterAnim = (p.thrusterAnim + 0.25) % (Math.PI * 2);
+
+  // ── Llamas de los motores laterales ──
+  const flameL = 12 + Math.sin(p.thrusterAnim) * 5;
+  const flameR = 12 + Math.sin(p.thrusterAnim + 1) * 5;
+  [-18, 18].forEach((ox, i) => {
+    const fh = i === 0 ? flameL : flameR;
+    const fg = ctx.createLinearGradient(ox, 10, ox, 10 + fh);
+    fg.addColorStop(0, '#00aaff');
+    fg.addColorStop(0.5, '#ff6600');
+    fg.addColorStop(1, 'transparent');
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.moveTo(ox - 5, 10);
+    ctx.lineTo(ox + 5, 10);
+    ctx.lineTo(ox, 10 + fh);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // ── Llama central pequeña (motor trasero) ──
+  const fc = ctx.createLinearGradient(0, 8, 0, 8 + 10 + Math.sin(p.thrusterAnim * 1.3) * 4);
+  fc.addColorStop(0, '#00ccff');
+  fc.addColorStop(1, 'transparent');
+  ctx.fillStyle = fc;
+  ctx.beginPath();
+  ctx.moveTo(-4, 8); ctx.lineTo(4, 8);
+  ctx.lineTo(0, 8 + 10 + Math.sin(p.thrusterAnim * 1.3) * 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // ── Alas traseras grandes ──
+  ctx.fillStyle = '#1e2a3a';
+  ctx.shadowColor = '#1155aa'; ctx.shadowBlur = 8;
+  // ala izquierda
+  ctx.beginPath();
+  ctx.moveTo(-10, 6);
+  ctx.lineTo(-30, 14);
+  ctx.lineTo(-26, 2);
+  ctx.lineTo(-14, -2);
+  ctx.closePath();
+  ctx.fill();
+  // ala derecha
+  ctx.beginPath();
+  ctx.moveTo(10, 6);
+  ctx.lineTo(30, 14);
+  ctx.lineTo(26, 2);
+  ctx.lineTo(14, -2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // ── Cañones laterales (tubos) ──
+  ctx.fillStyle = '#111820';
+  ctx.shadowColor = '#0099ff'; ctx.shadowBlur = 6;
+  // cañón izquierdo
+  ctx.fillRect(-26, -18, 7, 26);
+  ctx.fillRect(-23, -22, 4, 6);
+  // cañón derecho
+  ctx.fillRect(19, -18, 7, 26);
+  ctx.fillRect(19, -22, 4, 6);
+
+  // Detalles azules en los cañones
+  ctx.fillStyle = '#00aaff'; ctx.shadowColor = '#00aaff'; ctx.shadowBlur = 8;
+  ctx.fillRect(-25, -10, 5, 3);
+  ctx.fillRect(20, -10, 5, 3);
+  ctx.fillRect(-25, -2, 5, 3);
+  ctx.fillRect(20, -2, 5, 3);
+  ctx.shadowBlur = 0;
+
+  // ── Cuerpo principal ──
+  // Fuselaje oscuro
+  ctx.fillStyle = '#1a2535';
+  ctx.shadowColor = '#0066cc'; ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(0, -22);      // punta de la nave
+  ctx.lineTo(14, 0);
+  ctx.lineTo(12, 10);
+  ctx.lineTo(-12, 10);
+  ctx.lineTo(-14, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Detalles laterales azules del fuselaje
+  ctx.fillStyle = '#0088ff'; ctx.shadowColor = '#0088ff'; ctx.shadowBlur = 10;
+  // izquierda
+  ctx.beginPath();
+  ctx.moveTo(-14, 0); ctx.lineTo(-10, -8); ctx.lineTo(-7, 2); ctx.lineTo(-12, 6); ctx.closePath();
+  ctx.fill();
+  // derecha
+  ctx.beginPath();
+  ctx.moveTo(14, 0); ctx.lineTo(10, -8); ctx.lineTo(7, 2); ctx.lineTo(12, 6); ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // ── Cápsula/cabina (cockpit) ──
+  ctx.fillStyle = '#263040';
+  ctx.beginPath();
+  ctx.ellipse(0, -8, 5, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // cristal azul
+  ctx.fillStyle = 'rgba(0, 180, 255, 0.55)';
+  ctx.shadowColor = '#00ccff'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.ellipse(0, -10, 3, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // ── Líneas de detalle en el cuerpo ──
+  ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(6, -2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-7, 4); ctx.lineTo(7, 4); ctx.stroke();
+
+  // ── Aura de triple disparo ──
+  if (p.tripleShot > 0) {
+    ctx.fillStyle = `rgba(0, 170, 255, ${0.25 + 0.2 * Math.sin(frameCount * 0.2)})`;
+    ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI * 2); ctx.fill();
+  }
+
   ctx.restore();
 }
 
@@ -449,9 +923,9 @@ function applyPowerup(type) {
 function update() {
   frameCount++;
   const p=player;
-  if(keys['ArrowLeft']||keys['KeyA']) p.x=Math.max(p.w/2,p.x-p.speed);
-  if(keys['ArrowRight']||keys['KeyD']) p.x=Math.min(W-p.w/2,p.x+p.speed);
-  if(keys['Space']||keys['KeyZ']) shoot();
+  if(keys['ArrowLeft']||keys['KeyA']||keys['TouchLeft']) p.x=Math.max(p.w/2,p.x-p.speed);
+  if(keys['ArrowRight']||keys['KeyD']||keys['TouchRight']) p.x=Math.min(W-p.w/2,p.x+p.speed);
+  if(keys['Space']||keys['KeyZ']||keys['TouchFire']) shoot();
   if(p.shootCooldown>0) p.shootCooldown--;
   if(p.shield>0) p.shield--;
   if(p.tripleShot>0) p.tripleShot--;
@@ -535,6 +1009,84 @@ function draw() {
 
 function loop(){ if(state==='playing') update(); draw(); requestAnimationFrame(loop); }
 loop();
+
+// ── Responsive canvas scaling ──────────────────────────────
+function scaleGame() {
+  const wrapper = document.getElementById('gameWrapper');
+  const availW = window.innerWidth;
+  const availH = window.innerHeight;
+  const scaleX = availW / 480;
+  const scaleY = availH / 640;
+  const scale = Math.min(scaleX, scaleY, 1); // never upscale on desktop
+  wrapper.style.transform = `scale(${scale})`;
+  // Center horizontally
+  wrapper.style.marginLeft = `${(availW - 480 * scale) / 2}px`;
+}
+window.addEventListener('resize', scaleGame);
+scaleGame();
+
+// ── Touch / joystick controls ───────────────────────────────
+(function() {
+  const joystickArea = document.getElementById('joystickArea');
+  const knob = document.getElementById('joystickKnob');
+  const fireBtnEl = document.getElementById('fireBtn');
+  const BASE_R = 65; // radius of joystick base
+  let joystickActive = false;
+  let joystickId = null;
+  let joyX = 0; // -1 to 1
+
+  function getJoyOrigin() {
+    const r = joystickArea.getBoundingClientRect();
+    return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+  }
+
+  joystickArea.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    joystickId = t.identifier;
+    joystickActive = true;
+    updateJoy(t);
+  }, { passive: false });
+
+  joystickArea.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === joystickId) updateJoy(t);
+    }
+  }, { passive: false });
+
+  joystickArea.addEventListener('touchend', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === joystickId) {
+        joystickActive = false;
+        joystickId = null;
+        joyX = 0;
+        keys['TouchLeft'] = false;
+        keys['TouchRight'] = false;
+        knob.style.transform = 'translate(-50%, -50%)';
+      }
+    }
+  }, { passive: false });
+
+  function updateJoy(touch) {
+    const { cx, cy } = getJoyOrigin();
+    let dx = touch.clientX - cx;
+    const dy = touch.clientY - cy;
+    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), BASE_R);
+    const angle = Math.atan2(dy, dx);
+    const kx = Math.cos(angle) * dist;
+    joyX = kx / BASE_R;
+    knob.style.transform = `translate(calc(-50% + ${kx}px), -50%)`;
+    keys['TouchLeft']  = joyX < -0.2;
+    keys['TouchRight'] = joyX >  0.2;
+  }
+
+  // Fire button
+  fireBtnEl.addEventListener('touchstart', e => { e.preventDefault(); keys['TouchFire'] = true; }, { passive: false });
+  fireBtnEl.addEventListener('touchend',   e => { e.preventDefault(); keys['TouchFire'] = false; }, { passive: false });
+})();
+
 </script>
 </body>
 </html>
