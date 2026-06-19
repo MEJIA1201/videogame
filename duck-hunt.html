@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Duck Hunt — Arcade Hub</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      background:#0a0a0a;
+      display:flex;flex-direction:column;align-items:center;
+      justify-content:center;min-height:100vh;
+      font-family:'Press Start 2P','Courier New',monospace;
+      overflow:hidden;user-select:none;
+    }
+    #backBtn{
+      position:fixed;top:14px;left:14px;
+      background:rgba(0,0,0,0.6);border:1px solid rgba(255,140,0,0.5);
+      color:#f80;font-family:'Press Start 2P',monospace;font-size:9px;
+      padding:7px 13px;cursor:pointer;letter-spacing:1px;z-index:100;
+      transition:all .2s;border-radius:3px;
+    }
+    #backBtn:hover{background:rgba(255,140,0,0.15);border-color:#f80;}
+
+    /* ── Wrapper & canvas ── */
+    #wrap{position:relative;cursor:none;}
+    canvas{display:block;border-radius:4px;
+           box-shadow:0 0 0 3px #1a0f00, 0 0 40px rgba(255,140,0,0.25), 0 20px 60px rgba(0,0,0,0.8);}
+
+    /* ── Overlay (start / game over) ── */
+    #ov{
+      position:absolute;inset:0;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:rgba(0,0,0,0.82);z-index:10;border-radius:4px;
+      backdrop-filter:blur(2px);
+    }
+    #ov .logo{font-size:clamp(22px,5vw,40px);color:#f80;
+              text-shadow:0 0 30px #f80,0 0 60px #f804;
+              margin-bottom:8px;letter-spacing:3px;}
+    #ov .sub{font-size:9px;color:#a060208;color:#f804;margin-bottom:24px;letter-spacing:4px;}
+    #ov .instructions{
+      font-size:8px;color:#666;line-height:2.6;text-align:center;margin-bottom:24px;
+      border:1px solid #222;padding:14px 20px;border-radius:3px;background:rgba(255,140,0,0.04);
+    }
+    #ov .instructions b{color:#ff0;}
+    #ov .score-line{font-size:11px;margin-bottom:6px;}
+    #ov .score-line.main{color:#f80;text-shadow:0 0 10px #f80;}
+    #ov .score-line.best{color:#ff0;font-size:9px;}
+    #ov .btn-group{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:16px;}
+    .oBtn{
+      background:transparent;border:2px solid #f80;color:#f80;
+      font-family:'Press Start 2P',monospace;font-size:11px;
+      padding:10px 30px;cursor:pointer;letter-spacing:2px;
+      transition:all .2s;border-radius:2px;
+    }
+    .oBtn:hover{background:rgba(255,140,0,0.15);box-shadow:0 0 20px rgba(255,140,0,0.3);}
+    .oBtn.sec{border-color:#333;color:#555;font-size:8px;padding:7px 16px;}
+    .oBtn.sec:hover{border-color:#666;color:#888;background:transparent;}
+
+    /* ── Responsive ── */
+    #wrap{transform-origin:top center;}
+    @media(max-width:660px){body{justify-content:flex-start;padding-top:8px;}}
+  </style>
+</head>
+<body>
+<button id="backBtn" onclick="location.href='index.html'">◀ MENÚ</button>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="ov">
+    <div class="logo">🦆 DUCK HUNT</div>
+    <div class="sub">ARCADE EDITION</div>
+    <div class="instructions">
+      🖱️ Apunta y haz <b>clic</b> para disparar<br>
+      Tienes <b>3 balas</b> por ronda · se recargan solas<br>
+      Derriba <b>5 patos</b> por ronda para avanzar<br>
+      ¡El perro se reirá si se te escapan!
+    </div>
+    <div class="btn-group">
+      <button class="oBtn" id="startBtn">▶ JUGAR</button>
+      <button class="oBtn sec" onclick="location.href='index.html'">◀ MENÚ PRINCIPAL</button>
+    </div>
+  </div>
+</div>
+<script>
+// ── Canvas setup ──────────────────────────────────────────
+const CW=640, CH=480;
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+canvas.width=CW; canvas.height=CH;
+
+// ── Layout constants ──────────────────────────────────────
+const HUD_H      = 48;   // top bar height
+const GROUND_Y   = CH - 90;
+const SKY_TOP    = HUD_H;
+const DUCK_W     = 52, DUCK_H = 40;
+const MAX_AMMO   = 3, DUCKS_PER_ROUND = 5;
+
+// ── Game state ────────────────────────────────────────────
+let score, best, round, ducksKilled, ducksEscaped;
+let ammo, duck, particles, floats, running, frame;
+let reloading, reloadTimer;
+let dogState = 'hidden'; // 'hidden' | 'rising' | 'laughing' | 'sinking'
+let dogY, dogTargetY, dogAnim;
+let roundState = 'idle'; // 'idle' | 'showing'
+let roundMsg = '', roundColor = '#ff0', roundTimer = 0;
+let muzzleFlash = 0;
+let screenShake = {x:0,y:0,t:0};
+let mouseX = CW/2, mouseY = CH/2;
+
+best = +localStorage.getItem('dh_best') || 0;
+
+// ── Cloud positions (static per session) ─────────────────
+const clouds = [
+  {x:80,  y:75,  w:110, speed:0.12},
+  {x:310, y:55,  w:140, speed:0.08},
+  {x:530, y:80,  w:90,  speed:0.15},
+];
+
+// ── Tree positions ────────────────────────────────────────
+const trees = [
+  {x:30,  h:70},
+  {x:120, h:55},
+  {x:480, h:65},
+  {x:575, h:75},
+];
+
+// ── Duck factory ──────────────────────────────────────────
+// Speed formula: base + strong per-round ramp + small random jitter
+// Round 1: ~2.2  Round 3: ~4.2  Round 5: ~6.2  Round 8: ~9.2  (capped at 13)
+function duckSpeed(){
+  const base  = 2.0;
+  const ramp  = (round - 1) * 0.85;          // +0.85 each round
+  const jitter= Math.random() * 0.6;
+  return Math.min(base + ramp + jitter, 13);  // hard cap
+}
+function duckVSpeed(){
+  // Vertical wobble also grows a bit with round
+  return (0.5 + Math.min(round * 0.08, 0.6) + Math.random() * 0.5);
+}
+
+function makeDuck(){
+  const fromLeft = Math.random() < 0.5;
+  const spd = duckSpeed();
+  return {
+    x:    fromLeft ? -DUCK_W : CW + DUCK_W,
+    y:    SKY_TOP + 40 + Math.random() * (GROUND_Y - SKY_TOP - 120),
+    dir:  fromLeft ? 1 : -1,
+    vx:   (fromLeft ? 1 : -1) * spd,
+    vy:   -duckVSpeed(),
+    anim: Math.random() * Math.PI * 2,
+    falling: false, fallVy: 0,
+    hitFlash: 0, escaped: false, active: true,
+  };
+}
+
+// ── Init ──────────────────────────────────────────────────
+function initGame(){
+  score=0; round=1; ducksKilled=0; ducksEscaped=0;
+  ammo=MAX_AMMO; duck=null; particles=[]; floats=[]; running=true; frame=0;
+  reloading=false; reloadTimer=0;
+  dogState='hidden'; dogY=CH+120; dogAnim=0;
+  roundState='idle';
+  setTimeout(spawnDuck, 800);
+}
+
+function spawnDuck(){
+  if(!running) return;
+  duck = makeDuck();
+}
+
+// ── Particles ────────────────────────────────────────────
+function spawnFeathers(x,y){
+  const cols=['#d4a030','#8B5A1A','#f0d060','#fff','#a06820'];
+  for(let i=0;i<16;i++){
+    const a=Math.random()*Math.PI*2, s=Math.random()*5+1.5;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.5,
+      life:1,decay:0.02+Math.random()*0.01,
+      color:cols[i%cols.length], r:Math.random()*3+1.5, rot:Math.random()*6});
+  }
+}
+function spawnSmoke(x,y){
+  for(let i=0;i<6;i++){
+    const a=Math.random()*Math.PI*2, s=Math.random()*2+0.5;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,
+      life:0.7,decay:0.015,color:'#888',r:Math.random()*6+3,isSmoke:true});
+  }
+}
+
+// ── Float text ────────────────────────────────────────────
+function addFloat(x,y,text,color,size=14){
+  floats.push({x,y,text,color,size,life:1,decay:0.02,vy:1.2});
+}
+
+// ── Shoot ─────────────────────────────────────────────────
+function shoot(mx,my){
+  if(!running || reloading || !duck || duck.escaped) return;
+  if(ammo<=0) return;
+  ammo--;
+  muzzleFlash = 8;
+
+  const d = duck;
+  const hit = !d.falling && !d.escaped &&
+    mx >= d.x - DUCK_W*0.6 && mx <= d.x + DUCK_W*0.6 &&
+    my >= d.y - DUCK_H*0.7 && my <= d.y + DUCK_H*0.7;
+
+  if(hit){
+    d.falling = true; d.fallVy = -2; d.hitFlash = 18;
+    spawnFeathers(d.x, d.y);
+    screenShake = {x:0, y:0, t:8};
+    ducksKilled++;
+    const pts = (10 + round * 5);
+    score += pts;
+    if(score > best){ best = score; localStorage.setItem('dh_best', best); }
+    addFloat(d.x, d.y - 20, '+' + pts, '#ff0', 16);
+  } else {
+    addFloat(mx, my, 'MISS', '#f55', 13);
+    spawnSmoke(mx, my);
+  }
+
+  if(ammo <= 0 && !(d.falling)){
+    // All bullets spent, duck not hit → it escapes
+    startReload();
+  } else if(ammo <= 0){
+    startReload();
+  }
+}
+
+function startReload(){
+  reloading = true; reloadTimer = 100;
+}
+
+// ── Dog animation ─────────────────────────────────────────
+function triggerDogLaugh(){
+  dogState = 'rising';
+  dogY = CH + 120;
+  dogTargetY = GROUND_Y + 10;
+  dogAnim = 0;
+}
+
+// ── Round messages ────────────────────────────────────────
+function showRound(msg, color, cb){
+  roundState = 'showing';
+  roundMsg = msg; roundColor = color; roundTimer = 130;
+  const orig = cb;
+  const tick = ()=>{
+    roundTimer--;
+    if(roundTimer <= 0){ roundState='idle'; if(orig) orig(); }
+    else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+// ── Update ────────────────────────────────────────────────
+function update(){
+  if(!running) return;
+  frame++;
+
+  // Move clouds
+  clouds.forEach(c=>{ c.x += c.speed; if(c.x > CW + c.w) c.x = -c.w; });
+
+  // Screen shake
+  if(screenShake.t > 0){
+    screenShake.x = (Math.random()-0.5)*5*(screenShake.t/8);
+    screenShake.y = (Math.random()-0.5)*3*(screenShake.t/8);
+    screenShake.t--;
+  } else { screenShake.x=0; screenShake.y=0; }
+
+  // Reload
+  if(reloading){ reloadTimer--; if(reloadTimer<=0){ reloading=false; ammo=MAX_AMMO; } }
+
+  // Muzzle flash
+  if(muzzleFlash>0) muzzleFlash--;
+
+  // Dog
+  dogAnim += 0.08;
+  if(dogState==='rising'){
+    dogY += (dogTargetY - dogY) * 0.12;
+    if(Math.abs(dogY - dogTargetY) < 1){ dogY = dogTargetY; dogState='laughing'; }
+  }
+  if(dogState==='laughing'){
+    // stays up for 2.5s then sinks
+    if(!dogTimer){ dogTimer = setTimeout(()=>{ dogState='sinking'; dogTimer=null; }, 2500); }
+  }
+  if(dogState==='sinking'){
+    dogY += (CH + 120 - dogY) * 0.1;
+    if(dogY > CH + 100){ dogY = CH+120; dogState='hidden'; }
+  }
+
+  // Duck
+  if(duck && !duck.escaped){
+    duck.anim += 0.18;
+    if(duck.hitFlash > 0) duck.hitFlash--;
+
+    if(duck.falling){
+      duck.fallVy += 0.5;
+      duck.y += duck.fallVy;
+      duck.x += duck.vx * 0.15;
+      if(duck.y > CH + 60){
+        duck.escaped = true;
+        onDuckGone(true);
+      }
+    } else {
+      duck.x += duck.vx;
+      duck.y += duck.vy;
+      // Vertical bounce within sky
+      if(duck.y < SKY_TOP + 10) duck.vy = Math.abs(duck.vy);
+      if(duck.y > GROUND_Y - DUCK_H - 10) duck.vy = -Math.abs(duck.vy);
+      // Random vertical wobble
+      if(Math.random() < 0.007) duck.vy *= -1;
+      // Zig-zag: starts on round 2, probability grows each round (max 1.2%)
+      const zigProb = round >= 2 ? Math.min(0.002 + round * 0.0015, 0.012) : 0;
+      if(zigProb > 0 && Math.random() < zigProb){ duck.vx *= -1; duck.dir *= -1; }
+      // Escaped off-screen without being hit
+      if((duck.dir === 1 && duck.x > CW + DUCK_W) ||
+         (duck.dir === -1 && duck.x < -DUCK_W)){
+        duck.escaped = true;
+        ducksEscaped++;
+        triggerDogLaugh();
+        addFloat(CW/2, GROUND_Y - 30, '¡ESCAPÓ!', '#f55', 15);
+        onDuckGone(false);
+      }
+    }
+  }
+
+  // Particles
+  particles = particles.filter(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.12; p.vx*=0.96;
+    if(p.isSmoke){ p.r+=0.3; p.vx*=0.92; }
+    p.life -= p.decay;
+    return p.life > 0;
+  });
+
+  // Floats
+  floats = floats.filter(f=>{ f.y -= f.vy; f.life -= f.decay; return f.life > 0; });
+}
+
+let dogTimer = null;
+
+function onDuckGone(wasShot){
+  // Check if round over
+  if(ducksKilled + ducksEscaped >= DUCKS_PER_ROUND){
+    running = false;
+    setTimeout(()=>{
+      const nextSpd = Math.min(2.0 + round * 0.85, 13).toFixed(1);
+      const spdTag  = round < 10 ? ` — VEL x${nextSpd}` : ' — MAX VEL!';
+      if(ducksEscaped === 0){
+        showRound('¡RONDA PERFECTA! 🎯' + spdTag, '#0f0', nextRound);
+      } else if(ducksKilled >= 3){
+        showRound('RONDA COMPLETA' + spdTag, '#ff0', nextRound);
+      } else {
+        showRound('RONDA FALLIDA 🐕', '#f66', nextRound);
+      }
+    }, 700);
+  } else {
+    // Spawn next duck
+    setTimeout(spawnDuck, wasShot ? 900 : 500);
+  }
+}
+
+function nextRound(){
+  round++; ducksKilled=0; ducksEscaped=0;
+  duck=null; ammo=MAX_AMMO; reloading=false; reloadTimer=0;
+  running=true;
+  setTimeout(spawnDuck, 800);
+}
+
+// ══════════════════════════════════════════════════════════
+//  DRAW FUNCTIONS
+// ══════════════════════════════════════════════════════════
+
+// ── Sky ───────────────────────────────────────────────────
+function drawSky(){
+  const gr = ctx.createLinearGradient(0, SKY_TOP, 0, GROUND_Y);
+  gr.addColorStop(0,   '#0d2a5e');
+  gr.addColorStop(0.4, '#1a5fa0');
+  gr.addColorStop(1,   '#5baae0');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, SKY_TOP, CW, GROUND_Y - SKY_TOP);
+}
+
+// ── Sun ───────────────────────────────────────────────────
+function drawSun(){
+  const sx=CW-80, sy=SKY_TOP+50;
+  // Glow
+  const rg = ctx.createRadialGradient(sx,sy,10,sx,sy,55);
+  rg.addColorStop(0,'rgba(255,240,100,0.35)');
+  rg.addColorStop(1,'rgba(255,180,0,0)');
+  ctx.fillStyle=rg; ctx.beginPath(); ctx.arc(sx,sy,55,0,Math.PI*2); ctx.fill();
+  // Body
+  ctx.fillStyle='#ffe840';
+  ctx.shadowColor='#ffcc00'; ctx.shadowBlur=20;
+  ctx.beginPath(); ctx.arc(sx,sy,22,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+}
+
+// ── Clouds ────────────────────────────────────────────────
+function drawClouds(){
+  clouds.forEach(c=>{
+    ctx.save();
+    ctx.shadowColor='rgba(255,255,255,0.3)'; ctx.shadowBlur=8;
+    const puffs=[
+      {dx:0,     dy:0,  r:c.w*0.28},
+      {dx:c.w*0.3, dy:4,  r:c.w*0.22},
+      {dx:-c.w*0.28, dy:6, r:c.w*0.20},
+      {dx:c.w*0.12, dy:-c.w*0.1, r:c.w*0.18},
+    ];
+    // Shadow layer
+    ctx.fillStyle='rgba(180,200,220,0.6)';
+    puffs.forEach(p=>{
+      ctx.beginPath(); ctx.arc(c.x+p.dx, c.y+p.dy+6, p.r, 0, Math.PI*2); ctx.fill();
+    });
+    // White layer
+    ctx.fillStyle='rgba(240,248,255,0.92)';
+    puffs.forEach(p=>{
+      ctx.beginPath(); ctx.arc(c.x+p.dx, c.y+p.dy, p.r, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.shadowBlur=0; ctx.restore();
+  });
+}
+
+// ── Trees ─────────────────────────────────────────────────
+function drawTree(x, h){
+  const gx = x, gy = GROUND_Y;
+  // Trunk
+  ctx.fillStyle='#5a3010';
+  ctx.fillRect(gx-5, gy-h*0.35, 10, h*0.38);
+  // Foliage layers
+  const layers=[
+    {w:h*0.7, yOff:-h*0.3, col:'#1a6a10'},
+    {w:h*0.55,yOff:-h*0.55,col:'#22841a'},
+    {w:h*0.38,yOff:-h*0.78,col:'#2a9e20'},
+  ];
+  layers.forEach(l=>{
+    ctx.fillStyle=l.col;
+    ctx.beginPath();
+    ctx.moveTo(gx-l.w/2, gy+l.yOff+l.w*0.38);
+    ctx.lineTo(gx, gy+l.yOff-l.w*0.2);
+    ctx.lineTo(gx+l.w/2, gy+l.yOff+l.w*0.38);
+    ctx.closePath(); ctx.fill();
+  });
+}
+
+// ── Ground ────────────────────────────────────────────────
+function drawGround(){
+  // Main ground fill
+  const gr = ctx.createLinearGradient(0, GROUND_Y, 0, CH);
+  gr.addColorStop(0, '#3ab830');
+  gr.addColorStop(0.15,'#2da028');
+  gr.addColorStop(1,  '#16501a');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, GROUND_Y, CW, CH - GROUND_Y);
+
+  // Rolling hills
+  ctx.fillStyle='#44c838';
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y);
+  ctx.bezierCurveTo(80, GROUND_Y-28, 200, GROUND_Y-18, 320, GROUND_Y);
+  ctx.bezierCurveTo(420, GROUND_Y+8, 500, GROUND_Y-22, 640, GROUND_Y-10);
+  ctx.lineTo(CW, GROUND_Y); ctx.lineTo(0, GROUND_Y);
+  ctx.closePath(); ctx.fill();
+
+  // Darker stripe for depth
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  ctx.fillRect(0, GROUND_Y+1, CW, 6);
+
+  // Grass tufts
+  ctx.strokeStyle='#56de48'; ctx.lineWidth=1.5;
+  for(let gx=15; gx<CW; gx+=22){
+    const gy2=GROUND_Y + 2 + Math.sin(gx*0.3)*3;
+    ctx.beginPath(); ctx.moveTo(gx, gy2); ctx.lineTo(gx-3, gy2-7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx+4, gy2); ctx.lineTo(gx+7, gy2-6); ctx.stroke();
+  }
+
+  // Trees
+  trees.forEach(t => drawTree(t.x, t.h));
+}
+
+// ── HUD bar ───────────────────────────────────────────────
+function drawHUD(){
+  // Background bar
+  const gr = ctx.createLinearGradient(0,0,0,HUD_H);
+  gr.addColorStop(0,'rgba(20,10,0,0.96)');
+  gr.addColorStop(1,'rgba(10,5,0,0.92)');
+  ctx.fillStyle=gr; ctx.fillRect(0,0,CW,HUD_H);
+  ctx.fillStyle='rgba(255,140,0,0.15)';
+  ctx.fillRect(0,HUD_H-2,CW,2);
+
+  // Score
+  ctx.fillStyle='#f80'; ctx.font='10px "Press Start 2P"';
+  ctx.fillText('SCORE', 16, 18);
+  ctx.fillStyle='#fff'; ctx.font='bold 14px "Press Start 2P"';
+  ctx.fillText(score, 16, 38);
+
+  // Best
+  ctx.fillStyle='#f80'; ctx.font='10px "Press Start 2P"';
+  ctx.fillText('MEJOR', 140, 18);
+  ctx.fillStyle='#ff0'; ctx.font='bold 12px "Press Start 2P"';
+  ctx.fillText(best, 140, 38);
+
+  // Round
+  ctx.fillStyle='#f80'; ctx.font='10px "Press Start 2P"';
+  ctx.fillText('RONDA', CW/2-40, 18);
+  ctx.fillStyle='#fff'; ctx.font='bold 14px "Press Start 2P"';
+  ctx.fillText(round, CW/2-14, 38);
+
+  // Ducks killed
+  ctx.fillStyle='#f80'; ctx.font='10px "Press Start 2P"';
+  ctx.fillText('PATOS', CW-190, 18);
+  // Duck icons
+  for(let i=0;i<DUCKS_PER_ROUND;i++){
+    ctx.font='16px serif';
+    ctx.globalAlpha = i < ducksKilled ? 1 : 0.2;
+    ctx.fillText('🦆', CW-180+i*26, 38);
+  }
+  ctx.globalAlpha=1;
+
+  // Ammo bullets (right side)
+  for(let i=0;i<MAX_AMMO;i++){
+    const bx = CW - 36 - i*18, by = 8, bw=10, bh=20;
+    if(i < ammo){
+      ctx.fillStyle='#ffdd00';
+      ctx.shadowColor='#ffcc00'; ctx.shadowBlur=8;
+    } else {
+      ctx.fillStyle='#2a2a2a'; ctx.shadowBlur=0;
+    }
+    // Bullet shape
+    ctx.beginPath();
+    ctx.roundRect(bx, by+6, bw, bh-6, [0,0,2,2]);
+    ctx.fill();
+    ctx.fillStyle=i<ammo?'#ffaa00':'#1a1a1a';
+    ctx.shadowBlur=0;
+    ctx.beginPath();
+    ctx.ellipse(bx+bw/2, by+6, bw/2, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.shadowBlur=0;
+
+  // Round indicator (speed warning on high rounds)
+  if(round >= 4){
+    const bars = Math.min(round - 1, 8);
+    ctx.fillStyle='rgba(255,50,50,0.12)';
+    ctx.fillRect(0, HUD_H-4, CW, 4);
+    ctx.fillStyle='#f44';
+    ctx.shadowColor='#f44'; ctx.shadowBlur=8;
+    ctx.fillRect(0, HUD_H-4, (CW * bars/8), 4);
+    ctx.shadowBlur=0;
+  }
+
+  // Reload bar
+  if(reloading){
+    const pct = 1-(reloadTimer/100);
+    const bw=120, bh=8, bx=(CW-bw)/2-20, by=HUD_H+8;
+    ctx.fillStyle='rgba(0,0,0,0.6)';
+    ctx.roundRect && ctx.beginPath(),ctx.roundRect(bx-2,by-2,bw+4,bh+4,3),ctx.fill();
+    ctx.fillStyle='#1a1a1a'; ctx.fillRect(bx,by,bw,bh);
+    const rg=ctx.createLinearGradient(bx,0,bx+bw,0);
+    rg.addColorStop(0,'#f80'); rg.addColorStop(1,'#ff0');
+    ctx.fillStyle=rg;
+    ctx.shadowColor='#f80'; ctx.shadowBlur=6;
+    ctx.fillRect(bx,by,bw*pct,bh);
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#fff'; ctx.font='7px "Press Start 2P"';
+    ctx.textAlign='center'; ctx.fillText('RECARGANDO', CW/2-20, by+7); ctx.textAlign='left';
+  }
+}
+
+// ── Duck ──────────────────────────────────────────────────
+function drawDuck(d){
+  if(!d || d.escaped) return;
+  ctx.save();
+  ctx.translate(d.x + screenShake.x, d.y + screenShake.y);
+
+  // Flip for direction
+  if(d.dir === -1) ctx.scale(-1, 1);
+
+  // Rotation when falling
+  if(d.falling){
+    const spin = Math.min(d.fallVy * 0.12, 0.6);
+    ctx.rotate(spin);
+  }
+
+  const t = d.anim;
+  const flapAngle = d.falling ? 0.8 : Math.sin(t * 2.5) * 0.5;
+
+  // === Shadow ===
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(4, DUCK_H/2+4, DUCK_W*0.4, 6, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // === Hit flash override ===
+  const fl = d.hitFlash > 0 && d.hitFlash % 4 < 2;
+
+  // === Body ===
+  const bodyGr = ctx.createRadialGradient(-4, -4, 4, 0, 0, DUCK_W*0.45);
+  bodyGr.addColorStop(0, fl ? '#fff' : '#e0b020');
+  bodyGr.addColorStop(0.6, fl ? '#eee' : '#c89010');
+  bodyGr.addColorStop(1,   fl ? '#ddd' : '#a06808');
+  ctx.fillStyle = bodyGr;
+  ctx.shadowColor = fl ? '#fff' : 'rgba(200,140,0,0.3)';
+  ctx.shadowBlur = fl ? 14 : 4;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, DUCK_W*0.44, DUCK_H*0.38, 0.15, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur=0;
+
+  // === Wing (upper) ===
+  ctx.save();
+  ctx.rotate(-flapAngle);
+  const wGr = ctx.createRadialGradient(-2,-10,2,-2,-8,18);
+  wGr.addColorStop(0, fl?'#ddd':'#7a3c10');
+  wGr.addColorStop(1, fl?'#ccc':'#5a2808');
+  ctx.fillStyle = wGr;
+  ctx.beginPath();
+  ctx.ellipse(-2, -9, 18, 8, 0.2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  // === White breast patch ===
+  ctx.fillStyle = fl ? '#fff' : 'rgba(255,255,255,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(6, 4, 10, 8, 0.3, 0, Math.PI*2);
+  ctx.fill();
+
+  // === Neck ===
+  ctx.fillStyle = fl ? '#aff' : '#1a8a28';
+  ctx.beginPath();
+  ctx.ellipse(16, -4, 9, 11, 0.2, 0, Math.PI*2);
+  ctx.fill();
+
+  // === Head ===
+  const hGr = ctx.createRadialGradient(16,-12,3,16,-10,12);
+  hGr.addColorStop(0, fl?'#bff':'#22aa30');
+  hGr.addColorStop(1, fl?'#8ff':'#146a1e');
+  ctx.fillStyle = hGr;
+  ctx.beginPath();
+  ctx.arc(18, -11, 12, 0, Math.PI*2);
+  ctx.fill();
+
+  // === Iridescent shimmer on head ===
+  if(!fl){
+    ctx.fillStyle='rgba(100,255,180,0.2)';
+    ctx.beginPath(); ctx.ellipse(15,-15,6,4,-.5,0,Math.PI*2); ctx.fill();
+  }
+
+  // === Beak ===
+  ctx.fillStyle = fl ? '#ff0' : '#f0a000';
+  ctx.beginPath();
+  ctx.moveTo(27,-11); ctx.lineTo(37,-9); ctx.lineTo(36,-6); ctx.lineTo(27,-7);
+  ctx.closePath(); ctx.fill();
+  // Beak line
+  ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(27,-9); ctx.lineTo(36,-8); ctx.stroke();
+
+  // === Eye ===
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(21,-14,3.5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#111';
+  ctx.beginPath(); ctx.arc(22,-14,2,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(23,-15,0.8,0,Math.PI*2); ctx.fill();
+
+  // === Tail feathers ===
+  const tailCols = fl ? ['#eee','#ddd'] : ['#b07818','#8a5c10'];
+  [-6, -2, 2].forEach((off,i)=>{
+    ctx.fillStyle = tailCols[i%2];
+    ctx.beginPath();
+    ctx.moveTo(-18, off);
+    ctx.lineTo(-30 - i*3, off - 5 + i*2);
+    ctx.lineTo(-28 - i*2, off + 5);
+    ctx.closePath(); ctx.fill();
+  });
+
+  ctx.restore();
+}
+
+// ── Dog ───────────────────────────────────────────────────
+function drawDog(){
+  if(dogState === 'hidden') return;
+  const x = CW - 100, y = dogY;
+  const bobY = dogState==='laughing' ? Math.sin(dogAnim*4)*3 : 0;
+  const laugh = dogState === 'laughing';
+
+  ctx.save();
+  ctx.translate(x, y + bobY);
+
+  // === Shadow ===
+  ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.beginPath(); ctx.ellipse(0, 5, 36, 8, 0, 0, Math.PI*2); ctx.fill();
+
+  // === Body ===
+  const bGr=ctx.createLinearGradient(-30,-70,30,0);
+  bGr.addColorStop(0,'#d4a060'); bGr.addColorStop(1,'#b07840');
+  ctx.fillStyle=bGr;
+  ctx.beginPath();
+  ctx.roundRect(-28,-68,56,68,[8,8,4,4]);
+  ctx.fill();
+
+  // Body detail stripe
+  ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.beginPath(); ctx.roundRect(-10,-68,20,68,[4]); ctx.fill();
+
+  // === Legs ===
+  ctx.fillStyle='#c09050';
+  ctx.beginPath(); ctx.roundRect(-22, 0, 16, 28, [0,0,6,6]); ctx.fill();
+  ctx.beginPath(); ctx.roundRect( 6,  0, 16, 28, [0,0,6,6]); ctx.fill();
+  // Paws
+  ctx.fillStyle='#a07040';
+  ctx.beginPath(); ctx.ellipse(-14, 28, 10, 6, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 14, 28, 10, 6, 0, 0, Math.PI*2); ctx.fill();
+
+  // === Arms (raised when laughing) ===
+  const armAngle = laugh ? -0.7 + Math.sin(dogAnim*3)*0.15 : 0;
+  ctx.save();
+  ctx.translate(-28, -40);
+  ctx.rotate(armAngle - 0.3);
+  ctx.fillStyle='#c09050';
+  ctx.beginPath(); ctx.roundRect(-7,-24,14,28,[6]); ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.translate(28, -40);
+  ctx.rotate(-armAngle + 0.3);
+  ctx.fillStyle='#c09050';
+  ctx.beginPath(); ctx.roundRect(-7,-24,14,28,[6]); ctx.fill();
+  ctx.restore();
+
+  // === Head ===
+  const hGr2=ctx.createRadialGradient(0,-90,10,0,-85,38);
+  hGr2.addColorStop(0,'#ddb070'); hGr2.addColorStop(1,'#b08040');
+  ctx.fillStyle=hGr2;
+  ctx.beginPath(); ctx.arc(0,-88,36,0,Math.PI*2); ctx.fill();
+
+  // === Ears (floppy) ===
+  ctx.fillStyle='#9a6830';
+  ctx.save(); ctx.translate(-30,-88);
+  ctx.rotate(-0.2 + (laugh ? Math.sin(dogAnim*5)*0.15:0));
+  ctx.beginPath(); ctx.ellipse(0,0,10,22,0.3,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.save(); ctx.translate(30,-88);
+  ctx.rotate(0.2 - (laugh ? Math.sin(dogAnim*5)*0.15:0));
+  ctx.beginPath(); ctx.ellipse(0,0,10,22,-0.3,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // === Snout ===
+  ctx.fillStyle='#e8b878';
+  ctx.beginPath(); ctx.ellipse(0,-76,18,13,0,0,Math.PI*2); ctx.fill();
+
+  // === Nose ===
+  ctx.fillStyle='#3a1a0a';
+  ctx.beginPath(); ctx.ellipse(0,-83,7,5,0,0,Math.PI*2); ctx.fill();
+  // Nostril shine
+  ctx.fillStyle='rgba(255,255,255,0.4)';
+  ctx.beginPath(); ctx.ellipse(-3,-84,2,1.5,0,0,Math.PI*2); ctx.fill();
+
+  // === Eyes ===
+  if(laugh){
+    // Squint happy eyes (arcs)
+    ctx.strokeStyle='#2a1200'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(-14,-96,8,-Math.PI*0.05,Math.PI+0.05); ctx.stroke();
+    ctx.beginPath(); ctx.arc( 14,-96,8,-Math.PI*0.05,Math.PI+0.05); ctx.stroke();
+    // Eyebrows raised
+    ctx.strokeStyle='#7a4820'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(-14,-106,9,Math.PI+0.3,Math.PI*2-0.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc( 14,-106,9,Math.PI+0.3,Math.PI*2-0.3); ctx.stroke();
+  } else {
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(-14,-96,8,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 14,-96,8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#2a1200';
+    ctx.beginPath(); ctx.arc(-14,-96,4.5,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 14,-96,4.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(-12,-98,1.5,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 16,-98,1.5,0,Math.PI*2); ctx.fill();
+  }
+
+  // === Mouth / laugh ===
+  ctx.strokeStyle='#3a1200'; ctx.lineWidth=2.5;
+  if(laugh){
+    // Open laugh mouth
+    ctx.fillStyle='#8a2020';
+    ctx.beginPath(); ctx.arc(0,-72,10,0.1,Math.PI-0.1); ctx.fill();
+    ctx.fillStyle='#f8c0c0';
+    ctx.beginPath(); ctx.ellipse(0,-68,6,4,0,0,Math.PI*2); ctx.fill();
+    // HA HA HA text above dog
+    ctx.fillStyle='#ff4040';
+    ctx.font='bold 15px "Press Start 2P"';
+    ctx.textAlign='center';
+    ctx.shadowColor='#f00'; ctx.shadowBlur=12;
+    const bounce=Math.sin(dogAnim*4)*3;
+    ctx.fillText('HA  HA  HA!', 0, -135+bounce);
+    ctx.shadowBlur=0;
+    ctx.font='8px "Press Start 2P"';
+    ctx.fillStyle='#f88';
+    ctx.fillText('¡SE ESCAPÓ!', 0, -118);
+    ctx.textAlign='left';
+  } else {
+    ctx.beginPath(); ctx.arc(0,-72,9,0.1,Math.PI-0.1); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ── Particles ─────────────────────────────────────────────
+function drawParticles(){
+  particles.forEach(p=>{
+    ctx.save();
+    ctx.globalAlpha = p.isSmoke ? p.life*0.5 : p.life;
+    ctx.fillStyle = p.color;
+    if(!p.isSmoke){ ctx.shadowColor=p.color; ctx.shadowBlur=5; }
+    ctx.beginPath(); ctx.arc(p.x+screenShake.x, p.y+screenShake.y, p.r||3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0; ctx.restore();
+  });
+}
+
+// ── Float texts ───────────────────────────────────────────
+function drawFloats(){
+  floats.forEach(f=>{
+    ctx.save();
+    ctx.globalAlpha = f.life;
+    ctx.fillStyle = f.color;
+    ctx.font = `bold ${f.size}px "Press Start 2P"`;
+    ctx.textAlign='center';
+    ctx.shadowColor=f.color; ctx.shadowBlur=10;
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.shadowBlur=0; ctx.restore();
+  });
+  ctx.textAlign='left';
+}
+
+// ── Round message overlay ─────────────────────────────────
+function drawRoundMsg(){
+  if(roundState !== 'showing') return;
+  const alpha = Math.min(1, roundTimer/20);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  ctx.fillRect(0, CH/2-40, CW, 80);
+  ctx.fillStyle = roundColor;
+  ctx.font='18px "Press Start 2P"';
+  ctx.textAlign='center';
+  ctx.shadowColor=roundColor; ctx.shadowBlur=25;
+  ctx.fillText(roundMsg, CW/2, CH/2+8);
+  ctx.shadowBlur=0; ctx.restore();
+  ctx.textAlign='left';
+}
+
+// ── Muzzle flash ──────────────────────────────────────────
+function drawMuzzleFlash(){
+  if(muzzleFlash<=0) return;
+  ctx.save();
+  ctx.globalAlpha = muzzleFlash/8*0.18;
+  ctx.fillStyle='#ffe880';
+  ctx.fillRect(0,0,CW,CH);
+  ctx.restore();
+}
+
+// ── Crosshair ─────────────────────────────────────────────
+function drawCrosshair(x,y){
+  const sz=22, gap=7;
+  ctx.save();
+  // Outer ring
+  ctx.strokeStyle='rgba(255,255,255,0.25)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(x,y,sz-2,0,Math.PI*2); ctx.stroke();
+  // Arms
+  ctx.strokeStyle='rgba(255,50,50,0.95)';
+  ctx.lineWidth=1.8;
+  ctx.shadowColor='#ff3030'; ctx.shadowBlur=8;
+  const lines=[[x-sz,y,x-gap,y],[x+gap,y,x+sz,y],[x,y-sz,x,y-gap],[x,y+gap,x,y+sz]];
+  lines.forEach(([x1,y1,x2,y2])=>{
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+  // Center dot
+  ctx.fillStyle='rgba(255,60,60,0.9)';
+  ctx.beginPath(); ctx.arc(x,y,2.5,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0; ctx.restore();
+}
+
+// ── Main loop ─────────────────────────────────────────────
+function gameLoop(){
+  ctx.save();
+  ctx.translate(screenShake.x, screenShake.y);
+
+  update();
+  drawSky();
+  drawSun();
+  drawClouds();
+  drawGround();
+  if(duck) drawDuck(duck);
+  drawDog();
+  drawParticles();
+  drawFloats();
+  drawMuzzleFlash();
+  drawHUD();
+  drawRoundMsg();
+  drawCrosshair(mouseX, mouseY);
+
+  ctx.restore();
+  requestAnimationFrame(gameLoop);
+}
+
+// ── Input ─────────────────────────────────────────────────
+function getCanvasPos(clientX, clientY){
+  const r=canvas.getBoundingClientRect();
+  return { x:(clientX-r.left)*(CW/r.width), y:(clientY-r.top)*(CH/r.height) };
+}
+canvas.addEventListener('mousemove', e=>{
+  const p=getCanvasPos(e.clientX,e.clientY);
+  mouseX=p.x; mouseY=p.y;
+});
+canvas.addEventListener('click', e=>{
+  const p=getCanvasPos(e.clientX,e.clientY);
+  shoot(p.x,p.y);
+});
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  const p=getCanvasPos(e.touches[0].clientX,e.touches[0].clientY);
+  mouseX=p.x; mouseY=p.y;
+},{passive:false});
+canvas.addEventListener('touchend', e=>{
+  e.preventDefault();
+  const p=getCanvasPos(e.changedTouches[0].clientX,e.changedTouches[0].clientY);
+  shoot(p.x,p.y);
+},{passive:false});
+
+// ── Start button ──────────────────────────────────────────
+document.getElementById('startBtn').addEventListener('click',()=>{
+  document.getElementById('ov').style.display='none';
+  initGame();
+});
+
+// ── Responsive scale ──────────────────────────────────────
+function scaleGame(){
+  const wrap=document.getElementById('wrap');
+  const availW=window.innerWidth, availH=window.innerHeight-10;
+  const scale=Math.min(availW/CW, availH/CH, 1);
+  wrap.style.transform=`scale(${scale})`;
+  wrap.style.transformOrigin='top center';
+  wrap.style.marginLeft=`${(availW-CW*scale)/2}px`;
+}
+window.addEventListener('resize',scaleGame);
+scaleGame();
+
+// ── Bootstrap ─────────────────────────────────────────────
+duck=null; particles=[]; floats=[]; running=false;
+frame=0; dogState='hidden'; dogY=CH+120; dogAnim=0;
+roundState='idle'; muzzleFlash=0; reloading=false; reloadTimer=0;
+score=0; round=1; ducksKilled=0; ducksEscaped=0; ammo=MAX_AMMO;
+screenShake={x:0,y:0,t:0};
+gameLoop();
+</script>
+</body>
+</html>

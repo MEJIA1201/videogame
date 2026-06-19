@@ -216,6 +216,32 @@
     </div>
   </a>
 
+<!-- Duck Hunt -->
+  <a class="card yellow" href="duck-hunt.html">
+    <div class="card-preview">
+      🦆
+      <span class="badge new">NEW</span>
+    </div>
+    <div class="card-body">
+      <div class="card-title">DUCK HUNT</div>
+      <div class="card-desc">
+        El clásico de disparo de patos.<br>
+        Apunta y haz clic para derribarlos<br>
+        antes de que escapen. ¡3 balas!
+      </div>
+      <div class="card-tags">
+        <span class="tag">DISPARO</span>
+        <span class="tag">CLÁSICO</span>
+        <span class="tag">RONDAS</span>
+        <span class="tag">PUNTERÍA</span>
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="card-score">MEJOR: <span id="dh-best">0</span></span>
+      <button class="play-btn">▶ JUGAR</button>
+    </div>
+  </a>
+
 <!-- Snake -->
   <a class="card green" href="snake.html">
     <div class="card-preview">
@@ -273,6 +299,7 @@ drawStars();
 // Load best scores from localStorage
 document.getElementById('ss-best').textContent = localStorage.getItem('ss_best') || 0;
 document.getElementById('sn-best').textContent = localStorage.getItem('sn_best') || 0;
+document.getElementById('dh-best').textContent = localStorage.getItem('dh_best') || 0;
 </script>
 </body>
 </html>
