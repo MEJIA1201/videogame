@@ -97,6 +97,7 @@
     .card.yellow .card-preview { background: linear-gradient(135deg,#1a1400,#2a2000); }
     .card.green  .card-preview { background: linear-gradient(135deg,#001a00,#002a00); }
     .card.pink   .card-preview { background: linear-gradient(135deg,#1a001a,#2a002a); }
+    .card.orange .card-preview { background: linear-gradient(135deg,#1a0800,#2a1000); }
 
     .card-preview .badge {
       position: absolute; top:10px; right:10px;
@@ -119,6 +120,7 @@
     .card.yellow .card-title { color:#ff0; }
     .card.green  .card-title { color:#0f0; }
     .card.pink   .card-title { color:#f0f; }
+    .card.orange .card-title { color:#f80; }
 
     .card-desc {
       font-size: 7px;
@@ -139,6 +141,7 @@
     .card.yellow .tag { border-color:#ff04; color:#ff09; }
     .card.green  .tag { border-color:#0f04; color:#0f09; }
     .card.pink   .tag { border-color:#f0f4; color:#f0f9; }
+    .card.orange .tag { border-color:#f804; color:#f809; }
 
     .card-footer {
       padding: 12px 16px;
@@ -162,6 +165,10 @@
     .card.yellow .play-btn { background:#ff0; color:#000; }
     .card.green  .play-btn { background:#0f0; color:#000; }
     .card.pink   .play-btn { background:#f0f; color:#000; }
+    .card.orange .play-btn { background:#f80; color:#000; }
+
+    .card.cyan:hover  { border-color:#0ff; box-shadow: 0 0 30px #0ff4, 0 8px 30px #0002; }
+    .card.orange:hover{ border-color:#f80; box-shadow: 0 0 30px #f804, 0 8px 30px #0002; }
 
     .card-score { font-size: 7px; color:#444; }
 
@@ -268,6 +275,32 @@
     </div>
   </a>
 
+<!-- Penaltis -->
+  <a class="card orange" href="penaltis.html">
+    <div class="card-preview">
+      ⚽
+      <span class="badge new">NEW</span>
+    </div>
+    <div class="card-body">
+      <div class="card-title">PENALTIS</div>
+      <div class="card-desc">
+        Apunta con el ratón y chuta<br>
+        a portería. El portero se lanza<br>
+        al azar. ¡5 penaltis por partida!
+      </div>
+      <div class="card-tags">
+        <span class="tag">FÚTBOL</span>
+        <span class="tag">PUNTERÍA</span>
+        <span class="tag">PORTERO</span>
+        <span class="tag">PENALTI</span>
+      </div>
+    </div>
+    <div class="card-footer">
+      <span class="card-score">MEJOR: <span id="pk-best">0</span></span>
+      <button class="play-btn">▶ JUGAR</button>
+    </div>
+  </a>
+
 </div>
 
 <footer>◈ ARCADE HUB v1.0 — TODOS LOS JUEGOS EN UN SOLO LUGAR ◈</footer>
@@ -300,6 +333,7 @@ drawStars();
 document.getElementById('ss-best').textContent = localStorage.getItem('ss_best') || 0;
 document.getElementById('sn-best').textContent = localStorage.getItem('sn_best') || 0;
 document.getElementById('dh-best').textContent = localStorage.getItem('dh_best') || 0;
+document.getElementById('pk-best').textContent = localStorage.getItem('pk_best') || 0;
 </script>
 </body>
 </html>

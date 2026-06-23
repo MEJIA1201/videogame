@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Penaltis – Arcade Hub</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:#111;font-family:'Press Start 2P','Courier New',monospace;color:#fff;
+         display:flex;flex-direction:column;align-items:center;min-height:100vh;overflow-x:hidden;}
+    body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;
+      background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);
+      pointer-events:none;z-index:999;}
+    nav{width:100%;padding:12px 24px;background:#08081a;border-bottom:1px solid #1a1a3e;
+        display:flex;align-items:center;gap:16px;position:relative;z-index:1;}
+    nav a{font-size:8px;color:#0ff;text-decoration:none;letter-spacing:1px;}
+    nav a:hover{text-decoration:underline;}
+    nav .sep{font-size:8px;color:#333;}
+    nav .title{font-size:10px;color:#f80;margin:0 auto;letter-spacing:2px;}
+    #hud{position:relative;z-index:1;display:flex;gap:36px;align-items:center;
+         padding:14px 24px 0;font-size:9px;letter-spacing:1px;}
+    #hud .label{color:#555;} #hud .val{color:#f80;} #hud .red{color:#f44;}
+    #wrap{position:relative;margin-top:14px;z-index:1;}
+    canvas{display:block;border-radius:4px;border:2px solid #1a1a3e;}
+    .overlay{position:absolute;top:0;left:0;width:100%;height:100%;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:16px;background:rgba(0,0,0,0.80);z-index:10;border-radius:4px;}
+    .overlay h2{font-size:clamp(14px,3vw,22px);letter-spacing:3px;}
+    .overlay p{font-size:8px;color:#aaa;text-align:center;line-height:2;max-width:360px;}
+    .overlay .sub{font-size:7px;color:#555;}
+    .score-big{font-size:clamp(18px,4vw,30px);}
+    .btn{font-family:'Press Start 2P',monospace;font-size:9px;padding:12px 22px;
+         border:none;border-radius:2px;cursor:pointer;background:#f80;color:#000;
+         letter-spacing:1px;transition:opacity .2s;}
+    .btn:hover{opacity:.8;}
+    .btn.red{background:#f44;color:#fff;}
+    #instructions{position:relative;z-index:1;margin-top:12px;font-size:7px;color:#444;
+      text-align:center;line-height:2;max-width:600px;padding:0 16px 32px;}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="index.html">◄ VOLVER</a>
+  <span class="sep">/</span>
+  <span class="title">⚽ PENALTIS</span>
+</nav>
+<div id="hud">
+  <div><span class="label">PENALTI </span><span class="val" id="h-round">1/5</span></div>
+  <div><span class="val" id="h-score">⚽ 0</span><span class="label"> GOLES</span></div>
+  <div><span class="red" id="h-miss">✗ 0</span><span class="label"> PARADOS</span></div>
+  <div><span class="label">MEJOR </span><span class="val" id="h-best">0</span></div>
+</div>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div class="overlay" id="ov-start">
+    <h2 style="color:#f80">⚽ PENALTIS</h2>
+    <p>Haz <b>clic</b> en la portería para indicar<br>dónde quieres chutar el balón.</p>
+    <p class="sub">5 penaltis · el portero se lanza al azar</p>
+    <button class="btn" id="btn-start">▶ COMENZAR</button>
+  </div>
+  <div class="overlay" id="ov-result" style="display:none">
+    <h2 id="r-title">¡GOL!</h2>
+    <p id="r-msg" style="font-size:10px"></p>
+  </div>
+  <div class="overlay" id="ov-gameover" style="display:none">
+    <h2 style="color:#ff0">RESULTADO FINAL</h2>
+    <div class="score-big" id="go-score" style="color:#f80"></div>
+    <p id="go-msg"></p>
+    <button class="btn" id="btn-restart">▶ OTRA VEZ</button>
+    <a href="index.html"><button class="btn red">✕ MENÚ</button></a>
+  </div>
+</div>
+<div id="instructions">
+  HAZ CLIC EN LA PORTERÍA PARA APUNTAR Y CHUTAR<br>
+  EL PORTERO SE LANZA AL AZAR — BUSCA EL HUECO LIBRE
+</div>
+<script>
+// ═══════════════════════════════════════════════
+//  CONFIG  — portería más pequeña, centrada
+// ═══════════════════════════════════════════════
+const CW=640, CH=460;
+const TOTAL=5;
+
+// Goal — más estrecha y menos alta
+const GX=130, GY=38, GW=380, GH=120, POST=10;
+
+// Keeper
+const KW=40, KH=76;
+
+// Shooter position (bottom-center)
+const SX=CW/2, SY=CH-90;
+
+// Ball starts at shooter's feet
+const BX0=CW/2+8, BY0=SY+68;
+const BR=10;
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+canvas.width=CW; canvas.height=CH;
+
+// Game
+let state='idle'; // idle|aiming|kick_anim|shooting|result|gameover
+let round=0, goals=0, misses=0;
+let best=parseInt(localStorage.getItem('pk_best')||'0');
+document.getElementById('h-best').textContent=best;
+
+// Keeper state
+let kx=CW/2-KW/2, ky=GY+GH-KH+2;
+let ktx=kx, kspeed=0;
+// Keeper dive animation
+let kDiving=false;
+let kDiveDir=0;
+let kDiveProg=0;
+let kDiveDur=22;
+
+// Shooter kick animation
+let kickProg=0;           // 0→1  (wind-up + kick)
+let kickDur=18;           // frames for kick anim before ball launches
+let kickTargetX=0, kickTargetY=0;
+
+// Ball
+let bx=BX0, by=BY0, br=BR;
+let anim=null;            // {tx,ty,prog,dur}
+let ballSpin=0;
+
+// Aim
+let aimX=CW/2, aimY=GY+GH/2, aimVis=false;
+// Kick side (which foot, randomised each round)
+let kickSide=1;
+
+// ═══════════════════════════════════════════════
+//  DOM / INPUT
+// ═══════════════════════════════════════════════
+document.getElementById('btn-start').onclick=startGame;
+document.getElementById('btn-restart').onclick=startGame;
+
+function inGoal(x,y){
+  return x>GX+POST+2 && x<GX+GW-POST-2 && y>GY+POST+2 && y<GY+GH-2;
+}
+
+canvas.addEventListener('mousemove',e=>{
+  if(state!=='aiming') return;
+  const r=canvas.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(CW/r.width);
+  const my=(e.clientY-r.top)*(CH/r.height);
+  if(inGoal(mx,my)){aimX=mx;aimY=my;aimVis=true;canvas.style.cursor='crosshair';}
+  else{aimVis=false;canvas.style.cursor='default';}
+});
+canvas.addEventListener('mouseleave',()=>{aimVis=false;});
+canvas.addEventListener('click',e=>{
+  if(state!=='aiming') return;
+  const r=canvas.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(CW/r.width);
+  const my=(e.clientY-r.top)*(CH/r.height);
+  if(inGoal(mx,my)) startKickAnim(mx,my);
+});
+
+// ═══════════════════════════════════════════════
+//  GAME LOGIC
+// ═══════════════════════════════════════════════
+function startGame(){
+  round=0;goals=0;misses=0;
+  document.getElementById('ov-start').style.display='none';
+  document.getElementById('ov-result').style.display='none';
+  document.getElementById('ov-gameover').style.display='none';
+  updateHUD(); nextRound();
+}
+
+function nextRound(){
+  round++;
+  if(round>TOTAL){endGame();return;}
+  bx=BX0;by=BY0;br=BR;ballSpin=0;anim=null;
+  aimVis=false;canvas.style.cursor='default';
+  kx=CW/2-KW/2; ky=GY+GH-KH+2;
+  ktx=kx; kspeed=2+Math.random()*2;
+  kDiving=false; kDiveDir=0; kDiveProg=0;
+  kickProg=0;
+  kickSide=Math.random()<0.5?-1:1;
+  updateHUD(); state='aiming';
+}
+
+// Phase 1: kick wind-up animation, then launch ball
+function startKickAnim(tx,ty){
+  state='kick_anim';
+  aimVis=false;
+  kickProg=0;
+  kickTargetX=tx; kickTargetY=ty;
+
+  // Keeper picks a zone and starts creeping EARLY (before ball)
+  const zones=[GX+4, CW/2-KW/2, GX+GW-KW-4];
+  kDiveDir=[-1,0,1][Math.floor(Math.random()*3)];
+  ktx=zones[Math.floor(Math.random()*zones.length)];
+  kspeed=2; // slow creep during wind-up
+}
+
+// Phase 2: ball in flight
+function launchBall(){
+  state='shooting';
+  // Keeper now dives fast
+  kDiving=true; kDiveProg=0;
+  kspeed=18+Math.random()*10;
+  anim={tx:kickTargetX, ty:kickTargetY, prog:0, dur:40};
+}
+
+function checkResult(){
+  const tx=anim.tx, ty=anim.ty;
+  // Use current keeper position for collision
+  const kL=kx-6, kR=kx+KW+6, kT=ky-10, kB=ky+KH;
+  const saved=tx>kL&&tx<kR&&ty>kT&&ty<kB;
+  if(saved){misses++;showResult(false);}
+  else{goals++;showResult(true);}
+  updateHUD();
+}
+
+function showResult(isGoal){
+  state='result';
+  const t=document.getElementById('r-title');
+  const m=document.getElementById('r-msg');
+  if(isGoal){
+    t.textContent='⚽ ¡GOL!';t.style.color='#0f0';
+    m.textContent=['¡GOLAZO!','¡A LA RED!','¡IMPARABLE!','¡QUÉ CHUT!','¡PERFECTO!'][~~(Math.random()*5)];
+  }else{
+    t.textContent='🧤 PARADO';t.style.color='#f44';
+    m.textContent=['¡EL PORTERO LO PARA!','¡INCREÍBLE PARADA!','¡TE LO HA ADIVINADO!','¡EL MURO!'][~~(Math.random()*4)];
+  }
+  document.getElementById('ov-result').style.display='flex';
+  setTimeout(()=>{
+    document.getElementById('ov-result').style.display='none';
+    if(round>=TOTAL)endGame(); else nextRound();
+  },1800);
+}
+
+function endGame(){
+  state='gameover';
+  if(goals>best){best=goals;localStorage.setItem('pk_best',best);}
+  document.getElementById('go-score').textContent=goals+' / '+TOTAL+' GOLES';
+  const p=goals/TOTAL;
+  document.getElementById('go-msg').textContent=
+    p===1?'¡PERFECTO! ERES UN CRACK 🏆':
+    p>=0.6?'¡MUY BIEN! BUEN LANZADOR':
+    p>=0.4?'SIGUE ENTRENANDO...':'¡EL PORTERO TE HA GANADO! 🧤';
+  document.getElementById('ov-gameover').style.display='flex';
+  updateHUD();
+}
+
+function updateHUD(){
+  document.getElementById('h-round').textContent=round+'/'+TOTAL;
+  document.getElementById('h-score').textContent='⚽ '+goals;
+  document.getElementById('h-miss').textContent='✗ '+misses;
+  document.getElementById('h-best').textContent=best;
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW — PITCH
+// ═══════════════════════════════════════════════
+function drawPitch(){
+  // Stands / crowd bg
+  ctx.fillStyle='#1a1a1a';
+  ctx.fillRect(0,0,CW,GY+GH+8);
+
+  // Crowd (two tight rows)
+  const crowdShirts=['#c0392b','#2980b9','#f39c12','#8e44ad','#27ae60','#e74c3c','#3498db','#e67e22'];
+  const skins=['#f5cba7','#d4a574','#c8956c','#a0522d'];
+  const gap=13;
+  for(let row=0;row<2;row++){
+    for(let col=0;col<Math.floor(CW/gap)+1;col++){
+      const cx2=col*gap+4, cy2=row*13+5;
+      ctx.fillStyle=crowdShirts[(col+row*5)%crowdShirts.length];
+      ctx.fillRect(cx2-4,cy2+4,8,6);
+      ctx.fillStyle=skins[(col+row)%4];
+      ctx.beginPath();ctx.arc(cx2,cy2+2,4,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // Grass stripes (field, below goal line)
+  const sw=CW/10;
+  for(let i=0;i<10;i++){
+    ctx.fillStyle=i%2===0?'#2e7d32':'#388e3c';
+    ctx.fillRect(i*sw, GY+GH, sw, CH-(GY+GH));
+  }
+
+  // Goal interior grass
+  const gw=(GW-POST*2)/10;
+  for(let i=0;i<10;i++){
+    ctx.fillStyle=i%2===0?'#1b5e20':'#256029';
+    ctx.fillRect(GX+POST+i*gw, GY+POST, gw+1, GH-POST);
+  }
+
+  // Goal line (white)
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.fillRect(0,GY+GH,CW,3);
+
+  // Penalty area box
+  ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=2;
+  const paW=260, paH=90;
+  ctx.strokeRect(CW/2-paW/2, GY+GH+2, paW, paH);
+
+  // Penalty spot
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.beginPath();ctx.arc(CW/2,GY+GH+paH-10,4,0,Math.PI*2);ctx.fill();
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW — NET & POSTS
+// ═══════════════════════════════════════════════
+function drawNet(){
+  const nx=GW-POST*2, ny=GH-POST;
+  const cols=14, rows=8;
+  ctx.strokeStyle='rgba(210,210,210,0.28)';ctx.lineWidth=1;
+  for(let i=0;i<=rows;i++){
+    const y=GY+POST+i*(ny/rows);
+    ctx.beginPath();ctx.moveTo(GX+POST,y);ctx.lineTo(GX+GW-POST,y);ctx.stroke();
+  }
+  for(let i=0;i<=cols;i++){
+    const x=GX+POST+i*(nx/cols);
+    ctx.beginPath();ctx.moveTo(x,GY+POST);ctx.lineTo(x,GY+GH);ctx.stroke();
+  }
+}
+
+function drawPosts(){
+  // Shadows
+  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.fillRect(GX+5,GY+5,POST,GH);
+  ctx.fillRect(GX+GW-POST+5,GY+5,POST,GH);
+  ctx.fillRect(GX+5,GY-POST+5,GW,POST);
+  // Posts
+  ctx.fillStyle='#efefef';
+  ctx.fillRect(GX,GY,POST,GH);
+  ctx.fillRect(GX+GW-POST,GY,POST,GH);
+  ctx.fillRect(GX,GY-POST,GW,POST);
+  // Highlight edge
+  ctx.fillStyle='rgba(255,255,255,0.55)';
+  ctx.fillRect(GX,GY,3,GH);
+  ctx.fillRect(GX+GW-POST,GY,3,GH);
+  ctx.fillRect(GX,GY-POST,GW,3);
+  // Outline
+  ctx.strokeStyle='#bbb';ctx.lineWidth=1;
+  ctx.strokeRect(GX,GY,POST,GH);
+  ctx.strokeRect(GX+GW-POST,GY,POST,GH);
+  ctx.strokeRect(GX,GY-POST,GW,POST);
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW — KEEPER
+//  phase 0=standing, 1=fully dived
+//  diveDir: -1=left, 0=center, 1=right
+// ═══════════════════════════════════════════════
+function drawKeeper(kx, ky, phase, diveDir){
+  const cx = Math.round(kx + KW/2);
+
+  // When diving: body slides sideways and rises slightly
+  // No canvas rotation — just offset each block cleanly
+  const slideX = diveDir * phase * 20;   // body shifts toward dive side
+  const riseY  = phase * -14;            // body rises as keeper dives
+
+  // Glove on dive side shoots up and out; other glove tucks in
+  const gloveExtX = diveDir !== 0 ? phase * 20 : 0;  // extended glove goes out
+  const gloveExtY = diveDir !== 0 ? phase * -22 : 0; // extended glove goes up
+  const gloveTuckX = diveDir !== 0 ? phase * -6 : 0; // other glove pulls in
+  const gloveTuckY = diveDir !== 0 ? phase * 6  : 0; // other glove drops slightly
+
+  // Which glove extends (dive direction)
+  const leftExtX  = diveDir === -1 ? -gloveExtX  : (diveDir === 1 ? gloveTuckX  : 0);
+  const leftExtY  = diveDir === -1 ?  gloveExtY  : (diveDir === 1 ? gloveTuckY  : 0);
+  const rightExtX = diveDir ===  1 ?  gloveExtX  : (diveDir ===-1 ? -gloveTuckX : 0);
+  const rightExtY = diveDir ===  1 ?  gloveExtY  : (diveDir ===-1 ?  gloveTuckY : 0);
+
+  // Legs spread on dive side
+  const legSpread = diveDir !== 0 ? phase * 10 : 0;
+  const legLX = diveDir === -1 ? -legSpread : (diveDir === 1 ? -legSpread * 0.4 : 0);
+  const legRX = diveDir ===  1 ?  legSpread : (diveDir ===-1 ?  legSpread * 0.4 : 0);
+
+  const ox = slideX; // global horizontal offset
+  const oy = riseY;  // global vertical offset
+
+  // ── Shadow ──
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(cx - 20 + ox, ky + KH + 3, KW + 4, 5);
+
+  // ── BOOTS ──
+  ctx.fillStyle = '#111';
+  ctx.fillRect(cx - 17 + legLX + ox, ky + KH - 8 + oy, 13, 9);
+  ctx.fillRect(cx + 4  + legRX + ox, ky + KH - 8 + oy, 13, 9);
+
+  // ── LEGS ──
+  ctx.fillStyle = '#222';
+  ctx.fillRect(cx - 14 + legLX + ox, ky + 50 + oy, 10, 18);
+  ctx.fillRect(cx + 4  + legRX + ox, ky + 50 + oy, 10, 18);
+
+  // ── SHORTS ──
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(cx - 14 + ox, ky + 42 + oy, 28, 14);
+
+  // ── BODY ──
+  ctx.fillStyle = '#2c2c2c';
+  ctx.fillRect(cx - 16 + ox, ky + 18 + oy, 32, 28);
+  // collar
+  ctx.fillStyle = '#444';
+  ctx.fillRect(cx - 5 + ox, ky + 18 + oy, 10, 5);
+
+  // ── LEFT ARM ──
+  ctx.fillStyle = '#2c2c2c';
+  ctx.fillRect(cx - 34 + ox, ky + 22 + oy, 18, 10);
+
+  // ── RIGHT ARM ──
+  ctx.fillRect(cx + 16 + ox, ky + 22 + oy, 18, 10);
+
+  // ── LEFT GLOVE ──
+  ctx.fillStyle = '#e8e8e8';
+  ctx.fillRect(cx - 46 + leftExtX  + ox, ky + 20 + leftExtY  + oy, 14, 14);
+  ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1;
+  ctx.strokeRect(cx - 46 + leftExtX  + ox, ky + 20 + leftExtY  + oy, 14, 14);
+
+  // ── RIGHT GLOVE ──
+  ctx.fillStyle = '#e8e8e8';
+  ctx.fillRect(cx + 32 + rightExtX + ox, ky + 20 + rightExtY + oy, 14, 14);
+  ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1;
+  ctx.strokeRect(cx + 32 + rightExtX + ox, ky + 20 + rightExtY + oy, 14, 14);
+
+  // ── NECK ──
+  ctx.fillStyle = '#c8956c';
+  ctx.fillRect(cx - 5 + ox, ky + 10 + oy, 10, 10);
+
+  // ── HEAD ──
+  ctx.fillStyle = '#c8956c';
+  ctx.fillRect(cx - 12 + ox, ky - 4 + oy, 24, 18);
+
+  // ── HAIR ──
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(cx - 12 + ox, ky - 4 + oy, 24, 8);
+  ctx.fillRect(cx - 12 + ox, ky - 4 + oy, 4, 14);
+  ctx.fillRect(cx + 8  + ox, ky - 4 + oy, 4, 14);
+
+  // ── EYES ──
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(cx - 9 + ox, ky + 6 + oy, 5, 4);
+  ctx.fillRect(cx + 4 + ox, ky + 6 + oy, 5, 4);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(cx - 8 + ox, ky + 7 + oy, 3, 3);
+  ctx.fillRect(cx + 5 + ox, ky + 7 + oy, 3, 3);
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW — SHOOTER
+//  kickPhase 0=idle, >0=kick animation (0→1)
+//  kickSide: -1=left foot, 1=right foot
+// ═══════════════════════════════════════════════
+function drawShooter(kickPhase, kickSide){
+  const cx=Math.round(SX);
+  const ty=SY;
+
+  // Kick leg swings forward, other leg plants
+  // wind-up: phase 0→0.4  → kick leg goes BACK
+  // follow:  phase 0.4→1  → kick leg swings FORWARD
+  let kickLegY=0, kickLegFwd=0;
+  if(kickPhase>0){
+    if(kickPhase<0.4){
+      // wind-up: leg goes back
+      const t=kickPhase/0.4;
+      kickLegY  = t*16;   // leg lifts back
+      kickLegFwd=-t*8;
+    } else {
+      // follow-through: leg swings forward fast
+      const t=(kickPhase-0.4)/0.6;
+      kickLegY  = (1-t)*16 - t*20; // arcs forward
+      kickLegFwd= t*26;
+    }
+  }
+
+  // Which leg kicks (default right = +side)
+  const kickIsRight = kickSide>=0;
+  const legRY  = kickIsRight ? kickLegY   : 0;
+  const legRFwd= kickIsRight ? kickLegFwd : 0;
+  const legLY  = kickIsRight ? 0          : kickLegY;
+  const legLFwd= kickIsRight ? 0          : kickLegFwd;
+
+  // Body leans forward during kick
+  const bodyLean = kickPhase>0.4 ? (kickPhase-0.4)/0.6 * 0.22 : 0;
+
+  ctx.save();
+  // Slight forward tilt
+  ctx.translate(cx, ty+84);
+  ctx.rotate(bodyLean);
+  ctx.translate(-cx, -(ty+84));
+
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.fillRect(cx-16, ty+82, 32, 5);
+
+  // ── Plant foot boot (opposite of kick leg) ──
+  ctx.fillStyle='#111';
+  if(kickIsRight){
+    // Left boot stays, right boot follows kick
+    ctx.fillRect(cx-14, ty+74, 13, 9); // left boot (plant)
+    ctx.fillRect(cx+1+legRFwd, ty+74-legRY, 13, 9); // right boot (kick)
+  } else {
+    ctx.fillRect(cx+1,  ty+74, 13, 9); // right boot (plant)
+    ctx.fillRect(cx-14+legLFwd, ty+74-legLY, 13, 9); // left boot (kick)
+  }
+
+  // SOCKS (red)
+  ctx.fillStyle='#c0392b';
+  if(kickIsRight){
+    ctx.fillRect(cx-13, ty+58, 11, 18); // left sock
+    ctx.fillRect(cx+2+legRFwd, ty+58-legRY, 11, 18); // right sock kicks
+  } else {
+    ctx.fillRect(cx+2,  ty+58, 11, 18);
+    ctx.fillRect(cx-13+legLFwd, ty+58-legLY, 11, 18);
+  }
+
+  // SHORTS (red)
+  ctx.fillStyle='#c0392b';
+  ctx.fillRect(cx-14, ty+46, 28, 14);
+
+  // BODY white jersey
+  ctx.fillStyle='#e8e8e8';
+  ctx.fillRect(cx-15, ty+18, 30, 32);
+  ctx.fillStyle='rgba(0,0,0,0.07)';
+  ctx.fillRect(cx-8, ty+24, 16, 18);
+
+  // ARMS — swing opposite to kick on follow-through
+  const armSwing = kickPhase>0.4 ? ((kickPhase-0.4)/0.6)*14 : 0;
+  const armLFwd  = kickIsRight ? -armSwing : armSwing;
+  const armRFwd  = kickIsRight ?  armSwing : -armSwing;
+  ctx.fillStyle='#e8e8e8';
+  ctx.fillRect(cx-22, ty+20+armLFwd, 9, 26);
+  ctx.fillRect(cx+13, ty+20+armRFwd, 9, 26);
+  // Hands
+  ctx.fillStyle='#c8956c';
+  ctx.fillRect(cx-22, ty+44+armLFwd, 9, 10);
+  ctx.fillRect(cx+13, ty+44+armRFwd, 9, 10);
+
+  // NECK
+  ctx.fillStyle='#c8956c';
+  ctx.fillRect(cx-5, ty+10, 10, 10);
+
+  // HEAD (from behind, blonde)
+  ctx.fillStyle='#d4a017';
+  ctx.fillRect(cx-12, ty-4, 24, 20);
+  ctx.fillStyle='#b8860b';
+  ctx.fillRect(cx-12, ty+10, 24, 4);
+  ctx.fillRect(cx-10, ty+6,  20, 5);
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW — BALL
+// ═══════════════════════════════════════════════
+function drawBall(bx,by,br,spin){
+  ctx.save();
+  ctx.translate(Math.round(bx),Math.round(by));
+  ctx.rotate(spin);
+  // Shadow
+  ctx.save();ctx.scale(1,0.28);
+  ctx.beginPath();ctx.arc(0,br*4.8,br*0.85,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,0,0,0.28)';ctx.fill();ctx.restore();
+  // Base
+  ctx.beginPath();ctx.arc(0,0,br,0,Math.PI*2);
+  const g=ctx.createRadialGradient(-br*0.3,-br*0.35,br*0.05,0,0,br);
+  g.addColorStop(0,'#fff');g.addColorStop(0.6,'#e0e0e0');g.addColorStop(1,'#aaa');
+  ctx.fillStyle=g;ctx.fill();
+  ctx.strokeStyle='#888';ctx.lineWidth=0.8;ctx.stroke();
+  // Hex patches
+  ctx.fillStyle='#111';
+  drawHex(0,0,br*0.32);ctx.fill();
+  for(let i=0;i<5;i++){
+    const a=(i*Math.PI*2/5)-Math.PI/2;
+    drawHex(Math.cos(a)*br*0.58,Math.sin(a)*br*0.58,br*0.26);ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHex(px,py,r){
+  ctx.beginPath();
+  for(let i=0;i<6;i++){
+    const a=(i*Math.PI/3)-Math.PI/6;
+    i===0?ctx.moveTo(px+Math.cos(a)*r,py+Math.sin(a)*r)
+         :ctx.lineTo(px+Math.cos(a)*r,py+Math.sin(a)*r);
+  }
+  ctx.closePath();
+}
+
+// ═══════════════════════════════════════════════
+//  DRAW — AIM
+// ═══════════════════════════════════════════════
+function drawAim(){
+  if(!aimVis)return;
+  ctx.save();
+  ctx.strokeStyle='rgba(255,50,50,0.95)';ctx.lineWidth=2;
+  ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.arc(aimX,aimY,14,0,Math.PI*2);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(255,50,50,0.8)';ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(aimX-22,aimY);ctx.lineTo(aimX+22,aimY);
+  ctx.moveTo(aimX,aimY-22);ctx.lineTo(aimX,aimY+22);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════
+let last=0;
+
+function loop(ts){
+  last=last||ts;
+  const dt=Math.min(ts-last,50); last=ts;
+
+  // ── UPDATE ──
+
+  // Keeper slow drift during aiming, fast dive during shooting
+  if(state==='aiming'||state==='kick_anim'||state==='shooting'){
+    const diff=ktx-kx;
+    if(Math.abs(diff)>1) kx+=Math.sign(diff)*Math.min(kspeed,Math.abs(diff));
+  }
+
+  // Keeper dive animation progress
+  if(kDiving && kDiveProg<1){
+    kDiveProg=Math.min(kDiveProg+1/kDiveDur,1);
+  }
+
+  // Kick wind-up animation
+  if(state==='kick_anim'){
+    kickProg+=1/kickDur;
+    if(kickProg>=1){
+      kickProg=1;
+      launchBall(); // switch to shooting state
+    }
+  }
+
+  // Ball flight
+  if(state==='shooting'&&anim){
+    anim.prog++;
+    const p=Math.min(anim.prog/anim.dur,1);
+    const e=p<0.5?2*p*p:-1+(4-2*p)*p;
+    bx=BX0+(anim.tx-BX0)*e;
+    by=BY0+(anim.ty-BY0)*e;
+    br=BR*(1-0.55*e);
+    ballSpin+=0.22;
+    if(p>=1){checkResult();anim=null;}
+  }
+
+  // ── RENDER ──
+  ctx.clearRect(0,0,CW,CH);
+  drawPitch();
+  drawNet();
+
+  // Keeper dive phase
+  const kPhase = kDiving ? kDiveProg : 0;
+  drawKeeper(kx, ky, kPhase, kDiveDir);
+
+  drawPosts();
+  drawAim();
+  drawBall(bx,by,br,ballSpin);
+
+  // Shooter: show during aiming and kick anim
+  if(state==='aiming'){
+    drawShooter(0, kickSide);
+  } else if(state==='kick_anim'){
+    drawShooter(kickProg, kickSide);
+  }
+  // Hide shooter once ball is flying (kicked)
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
