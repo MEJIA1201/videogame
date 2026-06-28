@@ -142,7 +142,7 @@
   </style>
 </head>
 <body>
-<button id="backBtn" onclick="window.location.href='index.html'">◀ MENÚ</button>
+<button id="backBtn" onclick="window.location.href='../index.html'">◀ MENÚ</button>
 <div id="gameWrapper">
   <canvas id="canvas" width="480" height="640"></canvas>
   <div id="ui">
@@ -160,7 +160,7 @@
     <div class="subtitle">Recoge power-ups para ventajas</div>
     <div class="subtitle" style="margin-bottom:24px;">🛡 Escudo &nbsp; 🔥 Triple disparo &nbsp; ⭐ +50pts &nbsp; ♥ Vida</div>
     <button id="startBtn">▶ INICIAR</button>
-    <button class="btn-menu" onclick="window.location.href='index.html'">◀ MENÚ PRINCIPAL</button>
+    <button class="btn-menu" onclick="window.location.href='../index.html'">◀ MENÚ PRINCIPAL</button>
   </div>
 </div>
 
@@ -722,7 +722,7 @@ function showGameOver() {
     <div class="score-display">SCORE: ${score}</div>
     <div class="best-display">MEJOR: ${bestScore}</div>
     <button id="retryBtn">↺ REINTENTAR</button>
-    <button class="btn-menu" onclick="window.location.href='index.html'">◀ MENÚ PRINCIPAL</button>`;
+    <button class="btn-menu" onclick="window.location.href='../index.html'">◀ MENÚ PRINCIPAL</button>`;
   ov.style.display='flex';
   document.getElementById('retryBtn').addEventListener('click',()=>{
     ov.style.display='none'; initGame(); state='playing';

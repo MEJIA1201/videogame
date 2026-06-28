@@ -70,7 +70,7 @@
   </style>
 </head>
 <body>
-<button id="backBtn" onclick="location.href='index.html'">◀ MENÚ</button>
+<button id="backBtn" onclick="location.href='../index.html'">◀ MENÚ</button>
 <div id="hud">
   <div>SCORE:<span id="sEl"> 0</span></div>
   <div>MEJOR:<span id="bEl"> 0</span></div>
@@ -83,7 +83,7 @@
     <h1>SNAKE</h1>
     <p>← → ↑ ↓ para mover<br>Come manzanas 🍎 para crecer<br>⭐ Power-up: +3 longitud y puntos extra<br>💎 Gema: puntos dobles por 10 seg<br>No chocarte contigo mismo</p>
     <button id="startBtn">▶ INICIAR</button>
-    <button class="bm" onclick="location.href='index.html'">◀ MENÚ PRINCIPAL</button>
+    <button class="bm" onclick="location.href='../index.html'">◀ MENÚ PRINCIPAL</button>
   </div>
 </div>
 
@@ -261,7 +261,7 @@ function gameOver(){
     <div class="sd">SCORE: ${score}</div>
     <div class="bd">MEJOR: ${best}</div>
     <button id="retryBtn">↺ REINTENTAR</button>
-    <button class="bm" onclick="location.href='index.html'">◀ MENÚ PRINCIPAL</button>`;
+    <button class="bm" onclick="location.href='../index.html'">◀ MENÚ PRINCIPAL</button>`;
   ov.style.display='flex';
   document.getElementById('retryBtn').addEventListener('click',()=>{
     ov.style.display='none'; initGame();
