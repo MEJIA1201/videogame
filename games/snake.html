@@ -95,8 +95,8 @@
   <div class="dp-btn" id="dp-down">▼</div>
 </div>
 <script>
-const COLS=25, ROWS=25, T=20;
-const CW=COLS*T, CH=ROWS*T;
+const COLS=64, ROWS=36, T=20;
+const CW=COLS*T, CH=ROWS*T; // 1280x720
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 canvas.width=CW; canvas.height=CH;
@@ -107,7 +107,7 @@ document.getElementById('bEl').textContent=' '+best;
 let snake, dir, nextDir, food, powerup, gem, score, level, running, tick, interval, doubleScore, particles;
 
 function initGame(){
-  snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12}];
+  snake=[{x:32,y:18},{x:31,y:18},{x:30,y:18}];
   dir={x:1,y:0}; nextDir={x:1,y:0};
   score=0; level=1; tick=0; doubleScore=0; particles=[]; screenFlash=0;
   placeFood(); powerup=null; gem=null;
@@ -389,9 +389,9 @@ function drawStar(ctx,cx,cy,outerR,innerR,points){
 }
 
 // Static preview
-snake=[{x:12,y:12},{x:11,y:12},{x:10,y:12}];
+snake=[{x:32,y:18},{x:31,y:18},{x:30,y:18}];
 dir={x:1,y:0};
-food={x:15,y:10};
+food={x:36,y:14};
 powerup=null;gem=null;particles=[];running=false;
 draw();
 

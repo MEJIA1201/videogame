@@ -129,16 +129,16 @@
 </div>
 <script>
 // ── Canvas setup ──────────────────────────────────────────
-const CW=640, CH=480;
+const CW=1280, CH=720;
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 canvas.width=CW; canvas.height=CH;
 
 // ── Layout constants ──────────────────────────────────────
-const HUD_H      = 48;   // top bar height
-const GROUND_Y   = CH - 90;
+const HUD_H      = 72;   // top bar height
+const GROUND_Y   = CH - 135;
 const SKY_TOP    = HUD_H;
-const DUCK_W     = 52, DUCK_H = 40;
+const DUCK_W     = 104, DUCK_H = 60;
 const MAX_AMMO   = 3, DUCKS_PER_ROUND = 5;
 
 // ── Game state ────────────────────────────────────────────
@@ -157,31 +157,31 @@ best = +localStorage.getItem('dh_best') || 0;
 
 // ── Cloud positions (static per session) ─────────────────
 const clouds = [
-  {x:80,  y:75,  w:110, speed:0.12},
-  {x:310, y:55,  w:140, speed:0.08},
-  {x:530, y:80,  w:90,  speed:0.15},
+  {x:160,  y:113, w:220, speed:0.12},
+  {x:620,  y:83,  w:280, speed:0.08},
+  {x:1060, y:120, w:180, speed:0.15},
 ];
 
 // ── Tree positions ────────────────────────────────────────
 const trees = [
-  {x:30,  h:70},
-  {x:120, h:55},
-  {x:480, h:65},
-  {x:575, h:75},
+  {x:60,   h:105},
+  {x:240,  h:83},
+  {x:960,  h:98},
+  {x:1150, h:113},
 ];
 
 // ── Duck factory ──────────────────────────────────────────
 // Speed formula: base + strong per-round ramp + small random jitter
 // Round 1: ~2.2  Round 3: ~4.2  Round 5: ~6.2  Round 8: ~9.2  (capped at 13)
 function duckSpeed(){
-  const base  = 2.0;
-  const ramp  = (round - 1) * 0.85;          // +0.85 each round
-  const jitter= Math.random() * 0.6;
-  return Math.min(base + ramp + jitter, 13);  // hard cap
+  const base  = 4.0;
+  const ramp  = (round - 1) * 1.7;          // +1.7 each round
+  const jitter= Math.random() * 1.2;
+  return Math.min(base + ramp + jitter, 26);  // hard cap
 }
 function duckVSpeed(){
   // Vertical wobble also grows a bit with round
-  return (0.5 + Math.min(round * 0.08, 0.6) + Math.random() * 0.5);
+  return (0.75 + Math.min(round * 0.08, 0.6) + Math.random() * 0.75);
 }
 
 function makeDuck(){
@@ -189,7 +189,7 @@ function makeDuck(){
   const spd = duckSpeed();
   return {
     x:    fromLeft ? -DUCK_W : CW + DUCK_W,
-    y:    SKY_TOP + 40 + Math.random() * (GROUND_Y - SKY_TOP - 120),
+    y:    SKY_TOP + 60 + Math.random() * (GROUND_Y - SKY_TOP - 180),
     dir:  fromLeft ? 1 : -1,
     vx:   (fromLeft ? 1 : -1) * spd,
     vy:   -duckVSpeed(),
@@ -218,17 +218,17 @@ function spawnDuck(){
 function spawnFeathers(x,y){
   const cols=['#d4a030','#8B5A1A','#f0d060','#fff','#a06820'];
   for(let i=0;i<16;i++){
-    const a=Math.random()*Math.PI*2, s=Math.random()*5+1.5;
+    const a=Math.random()*Math.PI*2, s=Math.random()*7+2;
     particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.5,
       life:1,decay:0.02+Math.random()*0.01,
-      color:cols[i%cols.length], r:Math.random()*3+1.5, rot:Math.random()*6});
+      color:cols[i%cols.length], r:Math.random()*5+2, rot:Math.random()*6});
   }
 }
 function spawnSmoke(x,y){
   for(let i=0;i<6;i++){
-    const a=Math.random()*Math.PI*2, s=Math.random()*2+0.5;
+    const a=Math.random()*Math.PI*2, s=Math.random()*3+0.75;
     particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,
-      life:0.7,decay:0.015,color:'#888',r:Math.random()*6+3,isSmoke:true});
+      life:0.7,decay:0.015,color:'#888',r:Math.random()*9+4.5,isSmoke:true});
   }
 }
 
@@ -278,8 +278,8 @@ function startReload(){
 // ── Dog animation ─────────────────────────────────────────
 function triggerDogLaugh(){
   dogState = 'rising';
-  dogY = CH + 120;
-  dogTargetY = GROUND_Y + 10;
+  dogY = CH + 180;
+  dogTargetY = GROUND_Y + 15;
   dogAnim = 0;
 }
 
@@ -306,8 +306,8 @@ function update(){
 
   // Screen shake
   if(screenShake.t > 0){
-    screenShake.x = (Math.random()-0.5)*5*(screenShake.t/8);
-    screenShake.y = (Math.random()-0.5)*3*(screenShake.t/8);
+    screenShake.x = (Math.random()-0.5)*7.5*(screenShake.t/8);
+    screenShake.y = (Math.random()-0.5)*4.5*(screenShake.t/8);
     screenShake.t--;
   } else { screenShake.x=0; screenShake.y=0; }
 
@@ -329,7 +329,7 @@ function update(){
   }
   if(dogState==='sinking'){
     dogY += (CH + 120 - dogY) * 0.1;
-    if(dogY > CH + 100){ dogY = CH+120; dogState='hidden'; }
+    if(dogY > CH + 160){ dogY = CH+180; dogState='hidden'; }
   }
 
   // Duck

@@ -135,21 +135,21 @@
 // ═══════════════════════════════════════════════
 //  CONFIG  — portería más pequeña, centrada
 // ═══════════════════════════════════════════════
-const CW=640, CH=460;
+const CW=1280, CH=720;
 const TOTAL=5;
 
-// Goal — más estrecha y menos alta
-const GX=130, GY=38, GW=380, GH=120, POST=10;
+// Goal
+const GX=200, GY=60, GW=880, GH=188, POST=16;
 
 // Keeper
-const KW=40, KH=76;
+const KW=70, KH=133;
 
 // Shooter position (bottom-center)
-const SX=CW/2, SY=CH-90;
+const SX=CW/2, SY=CH-140;
 
 // Ball starts at shooter's feet
-const BX0=CW/2+8, BY0=SY+68;
-const BR=10;
+const BX0=CW/2+14, BY0=SY+110;
+const BR=16;
 
 // ═══════════════════════════════════════════════
 //  STATE
@@ -232,7 +232,7 @@ function nextRound(){
   bx=BX0;by=BY0;br=BR;ballSpin=0;anim=null;
   aimVis=false;canvas.style.cursor='default';
   kx=CW/2-KW/2; ky=GY+GH-KH+2;
-  ktx=kx; kspeed=2+Math.random()*2;
+  ktx=kx; kspeed=4+Math.random()*4;
   kDiving=false; kDiveDir=0; kDiveProg=0;
   kickProg=0;
   kickSide=Math.random()<0.5?-1:1;
@@ -258,7 +258,7 @@ function launchBall(){
   state='shooting';
   // Keeper now dives fast
   kDiving=true; kDiveProg=0;
-  kspeed=18+Math.random()*10;
+  kspeed=36+Math.random()*20;
   anim={tx:kickTargetX, ty:kickTargetY, prog:0, dur:40};
 }
 
@@ -321,14 +321,14 @@ function drawPitch(){
   // Crowd (two tight rows)
   const crowdShirts=['#c0392b','#2980b9','#f39c12','#8e44ad','#27ae60','#e74c3c','#3498db','#e67e22'];
   const skins=['#f5cba7','#d4a574','#c8956c','#a0522d'];
-  const gap=13;
+  const gap=20;
   for(let row=0;row<2;row++){
     for(let col=0;col<Math.floor(CW/gap)+1;col++){
-      const cx2=col*gap+4, cy2=row*13+5;
+      const cx2=col*gap+6, cy2=row*20+7;
       ctx.fillStyle=crowdShirts[(col+row*5)%crowdShirts.length];
-      ctx.fillRect(cx2-4,cy2+4,8,6);
+      ctx.fillRect(cx2-6,cy2+6,12,9);
       ctx.fillStyle=skins[(col+row)%4];
-      ctx.beginPath();ctx.arc(cx2,cy2+2,4,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(cx2,cy2+3,6,0,Math.PI*2);ctx.fill();
     }
   }
 
@@ -352,12 +352,12 @@ function drawPitch(){
 
   // Penalty area box
   ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=2;
-  const paW=260, paH=90;
+  const paW=520, paH=140;
   ctx.strokeRect(CW/2-paW/2, GY+GH+2, paW, paH);
 
   // Penalty spot
   ctx.fillStyle='rgba(255,255,255,0.85)';
-  ctx.beginPath();ctx.arc(CW/2,GY+GH+paH-10,4,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(CW/2,GY+GH+paH-16,6,0,Math.PI*2);ctx.fill();
 }
 
 // ═══════════════════════════════════════════════
@@ -365,7 +365,7 @@ function drawPitch(){
 // ═══════════════════════════════════════════════
 function drawNet(){
   const nx=GW-POST*2, ny=GH-POST;
-  const cols=14, rows=8;
+  const cols=28, rows=12;
   ctx.strokeStyle='rgba(210,210,210,0.28)';ctx.lineWidth=1;
   for(let i=0;i<=rows;i++){
     const y=GY+POST+i*(ny/rows);
@@ -407,97 +407,92 @@ function drawPosts(){
 // ═══════════════════════════════════════════════
 function drawKeeper(kx, ky, phase, diveDir){
   const cx = Math.round(kx + KW/2);
+  // Scale factor 1.75 vs original
+  const slideX = diveDir * phase * 35;
+  const riseY  = phase * -24;
 
-  // When diving: body slides sideways and rises slightly
-  // No canvas rotation — just offset each block cleanly
-  const slideX = diveDir * phase * 20;   // body shifts toward dive side
-  const riseY  = phase * -14;            // body rises as keeper dives
+  const gloveExtX  = diveDir !== 0 ? phase * 35  : 0;
+  const gloveExtY  = diveDir !== 0 ? phase * -39  : 0;
+  const gloveTuckX = diveDir !== 0 ? phase * -11  : 0;
+  const gloveTuckY = diveDir !== 0 ? phase * 11   : 0;
 
-  // Glove on dive side shoots up and out; other glove tucks in
-  const gloveExtX = diveDir !== 0 ? phase * 20 : 0;  // extended glove goes out
-  const gloveExtY = diveDir !== 0 ? phase * -22 : 0; // extended glove goes up
-  const gloveTuckX = diveDir !== 0 ? phase * -6 : 0; // other glove pulls in
-  const gloveTuckY = diveDir !== 0 ? phase * 6  : 0; // other glove drops slightly
-
-  // Which glove extends (dive direction)
   const leftExtX  = diveDir === -1 ? -gloveExtX  : (diveDir === 1 ? gloveTuckX  : 0);
   const leftExtY  = diveDir === -1 ?  gloveExtY  : (diveDir === 1 ? gloveTuckY  : 0);
   const rightExtX = diveDir ===  1 ?  gloveExtX  : (diveDir ===-1 ? -gloveTuckX : 0);
   const rightExtY = diveDir ===  1 ?  gloveExtY  : (diveDir ===-1 ?  gloveTuckY : 0);
 
-  // Legs spread on dive side
-  const legSpread = diveDir !== 0 ? phase * 10 : 0;
+  const legSpread = diveDir !== 0 ? phase * 18 : 0;
   const legLX = diveDir === -1 ? -legSpread : (diveDir === 1 ? -legSpread * 0.4 : 0);
   const legRX = diveDir ===  1 ?  legSpread : (diveDir ===-1 ?  legSpread * 0.4 : 0);
 
-  const ox = slideX; // global horizontal offset
-  const oy = riseY;  // global vertical offset
+  const ox = slideX;
+  const oy = riseY;
 
   // ── Shadow ──
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(cx - 20 + ox, ky + KH + 3, KW + 4, 5);
+  ctx.fillRect(cx - 35 + ox, ky + KH + 5, KW + 7, 9);
 
   // ── BOOTS ──
   ctx.fillStyle = '#111';
-  ctx.fillRect(cx - 17 + legLX + ox, ky + KH - 8 + oy, 13, 9);
-  ctx.fillRect(cx + 4  + legRX + ox, ky + KH - 8 + oy, 13, 9);
+  ctx.fillRect(cx - 30 + legLX + ox, ky + KH - 14 + oy, 23, 16);
+  ctx.fillRect(cx + 7  + legRX + ox, ky + KH - 14 + oy, 23, 16);
 
   // ── LEGS ──
   ctx.fillStyle = '#222';
-  ctx.fillRect(cx - 14 + legLX + ox, ky + 50 + oy, 10, 18);
-  ctx.fillRect(cx + 4  + legRX + ox, ky + 50 + oy, 10, 18);
+  ctx.fillRect(cx - 25 + legLX + ox, ky + 88 + oy, 18, 32);
+  ctx.fillRect(cx + 7  + legRX + ox, ky + 88 + oy, 18, 32);
 
   // ── SHORTS ──
   ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(cx - 14 + ox, ky + 42 + oy, 28, 14);
+  ctx.fillRect(cx - 25 + ox, ky + 74 + oy, 50, 25);
 
   // ── BODY ──
   ctx.fillStyle = '#2c2c2c';
-  ctx.fillRect(cx - 16 + ox, ky + 18 + oy, 32, 28);
+  ctx.fillRect(cx - 28 + ox, ky + 32 + oy, 56, 49);
   // collar
   ctx.fillStyle = '#444';
-  ctx.fillRect(cx - 5 + ox, ky + 18 + oy, 10, 5);
+  ctx.fillRect(cx - 9 + ox, ky + 32 + oy, 18, 9);
 
   // ── LEFT ARM ──
   ctx.fillStyle = '#2c2c2c';
-  ctx.fillRect(cx - 34 + ox, ky + 22 + oy, 18, 10);
+  ctx.fillRect(cx - 60 + ox, ky + 39 + oy, 32, 18);
 
   // ── RIGHT ARM ──
-  ctx.fillRect(cx + 16 + ox, ky + 22 + oy, 18, 10);
+  ctx.fillRect(cx + 28 + ox, ky + 39 + oy, 32, 18);
 
   // ── LEFT GLOVE ──
   ctx.fillStyle = '#e8e8e8';
-  ctx.fillRect(cx - 46 + leftExtX  + ox, ky + 20 + leftExtY  + oy, 14, 14);
+  ctx.fillRect(cx - 81 + leftExtX  + ox, ky + 35 + leftExtY  + oy, 25, 25);
   ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1;
-  ctx.strokeRect(cx - 46 + leftExtX  + ox, ky + 20 + leftExtY  + oy, 14, 14);
+  ctx.strokeRect(cx - 81 + leftExtX  + ox, ky + 35 + leftExtY  + oy, 25, 25);
 
   // ── RIGHT GLOVE ──
   ctx.fillStyle = '#e8e8e8';
-  ctx.fillRect(cx + 32 + rightExtX + ox, ky + 20 + rightExtY + oy, 14, 14);
+  ctx.fillRect(cx + 56 + rightExtX + ox, ky + 35 + rightExtY + oy, 25, 25);
   ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1;
-  ctx.strokeRect(cx + 32 + rightExtX + ox, ky + 20 + rightExtY + oy, 14, 14);
+  ctx.strokeRect(cx + 56 + rightExtX + ox, ky + 35 + rightExtY + oy, 25, 25);
 
   // ── NECK ──
   ctx.fillStyle = '#c8956c';
-  ctx.fillRect(cx - 5 + ox, ky + 10 + oy, 10, 10);
+  ctx.fillRect(cx - 9 + ox, ky + 18 + oy, 18, 18);
 
   // ── HEAD ──
   ctx.fillStyle = '#c8956c';
-  ctx.fillRect(cx - 12 + ox, ky - 4 + oy, 24, 18);
+  ctx.fillRect(cx - 21 + ox, ky - 7 + oy, 42, 32);
 
   // ── HAIR ──
   ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(cx - 12 + ox, ky - 4 + oy, 24, 8);
-  ctx.fillRect(cx - 12 + ox, ky - 4 + oy, 4, 14);
-  ctx.fillRect(cx + 8  + ox, ky - 4 + oy, 4, 14);
+  ctx.fillRect(cx - 21 + ox, ky - 7 + oy, 42, 14);
+  ctx.fillRect(cx - 21 + ox, ky - 7 + oy, 7, 25);
+  ctx.fillRect(cx + 14 + ox, ky - 7 + oy, 7, 25);
 
   // ── EYES ──
   ctx.fillStyle = '#fff';
-  ctx.fillRect(cx - 9 + ox, ky + 6 + oy, 5, 4);
-  ctx.fillRect(cx + 4 + ox, ky + 6 + oy, 5, 4);
+  ctx.fillRect(cx - 16 + ox, ky + 11 + oy, 9, 7);
+  ctx.fillRect(cx + 7  + ox, ky + 11 + oy, 9, 7);
   ctx.fillStyle = '#111';
-  ctx.fillRect(cx - 8 + ox, ky + 7 + oy, 3, 3);
-  ctx.fillRect(cx + 5 + ox, ky + 7 + oy, 3, 3);
+  ctx.fillRect(cx - 14 + ox, ky + 12 + oy, 5, 5);
+  ctx.fillRect(cx + 9  + ox, ky + 12 + oy, 5, 5);
 }
 
 // ═══════════════════════════════════════════════
